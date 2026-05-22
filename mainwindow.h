@@ -5,8 +5,15 @@
 #include "modwindow.h"
 #include "MinecraftDownloader.h"
 #include <QMainWindow>
-#include "moddetailswindow.h"
+#include "moddetailwindow.h"
 #include "settingswindow.h"
+#include <QOAuth2AuthorizationCodeFlow>
+#include <QOAuthHttpServerReplyHandler>
+#include <QNetworkAccessManager>
+#include <QDesktopServices>
+#include <QUrl>
+#include <QProgressBar>
+
 class MainWindow : public QMainWindow, private Ui::MainWindow
 {
     Q_OBJECT
@@ -31,7 +38,11 @@ private slots:
     void on_SettingsButton_clicked();
     void on_PickAccountButton_clicked();
     void on_InstallerButton_clicked();
+    void requestElyProfile();
 private:
+    QProgressBar* progressBar = nullptr;
+    QNetworkAccessManager networkManager;
+    QOAuth2AuthorizationCodeFlow* elyAuth = nullptr;
     SettingsWindow* settingsWindow = nullptr;
     QComboBox* LoaderBox = nullptr;
 

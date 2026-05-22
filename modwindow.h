@@ -1,13 +1,15 @@
 #pragma once
 
 #include "modrinthapi.h"
-
 #include <QDialog>
-#include <QLineEdit>
-#include <QPushButton>
-#include <QListWidget>
-#include <QLabel>
-#include <QNetworkAccessManager>
+#include <QVector>
+#include <QEvent>
+
+class QLineEdit;
+class QPushButton;
+class QScrollArea;
+class QWidget;
+class QVBoxLayout;
 
 class ModWindow : public QDialog
 {
@@ -16,29 +18,25 @@ class ModWindow : public QDialog
 public:
     explicit ModWindow(QWidget *parent = nullptr);
 
-private slots:
+protected:
+    bool eventFilter(QObject* obj, QEvent* event) override;
+
+private slots: // QVector
     void onDownloadLinks(const QVector<QUrl>& urls);
 
 private:
-    // Поиск
     QLineEdit* searchEdit = nullptr;
     QPushButton* searchButton = nullptr;
-
-    // Список модов
-    QListWidget* modList = nullptr;
-
-    // Информация
-    QLabel* descriptionLabel = nullptr;
-
-    // Установка
+    QScrollArea* scrollArea = nullptr;
+    QWidget* cardsWidget = nullptr;
+    QVBoxLayout* cardsLayout = nullptr;
     QPushButton* installButton = nullptr;
 
-    // API Modrinth
     ModrithAPI* api = nullptr;
 
-    // Скачивание файлов
-    QNetworkAccessManager downloadManager;
-
-    // Кэш найденных модов
     QVector<Mod> cachedMods;
+
+    void clearCards();
+    void addModCards(const QList<Mod>& mods);
+    void installSelectedMod();
 };

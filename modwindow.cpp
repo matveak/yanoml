@@ -1,226 +1,189 @@
 #include "modwindow.h"
-#include "ModDetailsWindow.h"
-#include <QFile>
-#include <QDir>
-#include <QStandardPaths>
-#include <QFileInfo>
+#include "ModDetailWindow.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLineEdit>
-#include <QListWidget>
 #include <QPushButton>
 #include <QLabel>
 #include <QMessageBox>
+#include <QScrollArea>
+#include <QFrame>
+#include <QDebug>
+#include <QDir>
+#include <QStandardPaths>
+#include <QFileInfo>
 
-void ModWindow::onDownloadLinks(
-    const QVector<QUrl>& urls)
+ModWindow::ModWindow(QWidget *parent) : QDialog(parent)
 {
-    if(urls.isEmpty())
-        return;
-
-    QUrl downloadUrl = urls.first();
-
-    QNetworkReply* reply =
-        downloadManager.get(
-            QNetworkRequest(downloadUrl));
-
-    connect(reply,
-            &QNetworkReply::finished,
-            this,
-            [this,
-             reply,
-             downloadUrl]()
-            {
-                reply->deleteLater();
-
-                if(reply->error() !=
-                    QNetworkReply::NoError)
-                {
-                    QMessageBox::warning(
-                        this,
-                        "Ошибка",
-                        reply->errorString());
-
-                    return;
-                }
-
-                QString modsPath =
-                    QDir::homePath() +
-                    "/AppData/Roaming/.minecraft/mods";
-
-                QDir().mkpath(modsPath);
-
-                QString fileName =
-                    QFileInfo(
-                        downloadUrl.path())
-                        .fileName();
-
-                QString filePath =
-                    modsPath +
-                    "/" +
-                    fileName;
-
-                QFile file(filePath);
-
-                if(!file.open(
-                        QIODevice::WriteOnly))
-                {
-                    QMessageBox::warning(
-                        this,
-                        "Ошибка",
-                        "Не удалось создать файл");
-
-                    return;
-                }
-
-                file.write(reply->readAll());
-                file.close();
-
-                QMessageBox::information(
-                    this,
-                    "Успех",
-                    "Мод установлен:\n" +
-                        fileName);
-            });
-}
-ModWindow::ModWindow(QWidget *parent)
-    : QDialog(parent)
-{
-
-    setWindowTitle("Менеджер модов");
-    resize(900, 600);
+    setWindowTitle("Менеджер модов — Modrinth");
+    resize(1150, 780);
+    setStyleSheet("background-color: #18181B; color: #F1F1F1;");
 
     api = new ModrithAPI(this);
 
-    auto* mainLayout = new QVBoxLayout(this);
+    QVBoxLayout* mainLayout = new QVBoxLayout(this);
+    mainLayout->setContentsMargins(15, 15, 15, 15);
+    mainLayout->setSpacing(12);
 
-    auto* searchLayout = new QHBoxLayout();
-
+    // Поиск
+    QHBoxLayout* searchLayout = new QHBoxLayout();
     searchEdit = new QLineEdit(this);
-    searchEdit->setPlaceholderText("Введите название мода...");
+    searchEdit->setPlaceholderText("Поиск модов...");
+    searchEdit->setFixedHeight(42);
 
     searchButton = new QPushButton("Поиск", this);
+    searchButton->setFixedHeight(42);
+    searchButton->setFixedWidth(120);
 
     searchLayout->addWidget(searchEdit);
     searchLayout->addWidget(searchButton);
 
-    modList = new QListWidget(this);
+    // Карточки
+    scrollArea = new QScrollArea(this);
+    scrollArea->setWidgetResizable(true);
+    scrollArea->setFrameShape(QFrame::NoFrame);
 
-    descriptionLabel = new QLabel(this);
-    descriptionLabel->setWordWrap(true);
-    descriptionLabel->setMinimumHeight(100);
+    cardsWidget = new QWidget();
+    cardsLayout = new QVBoxLayout(cardsWidget);
+    cardsLayout->setSpacing(12);
+    cardsLayout->setContentsMargins(0, 0, 0, 0);
 
-    installButton = new QPushButton("Скачать мод", this);
+    scrollArea->setWidget(cardsWidget);
+
+    // Кнопка
+    installButton = new QPushButton("Установить выбранный мод", this);
+    installButton->setFixedHeight(52);
 
     mainLayout->addLayout(searchLayout);
-    mainLayout->addWidget(modList);
-    mainLayout->addWidget(descriptionLabel);
+    mainLayout->addWidget(scrollArea, 1);
     mainLayout->addWidget(installButton);
-    connect(api,
-            &ModrithAPI::DownloadLinks,
-            this,
-            &ModWindow::onDownloadLinks);
-    connect(searchButton,
-            &QPushButton::clicked,
-            this,
-            [this]()
-            {
-                modList->clear();
 
-                api->getMods(
-                    searchEdit->text(),
-                    SortOrder::downloads,
-                    0,
-                    50);
-            });
+    // Сигналы
+    connect(searchButton, &QPushButton::clicked, this, [this]() {
+        QString query = searchEdit->text().trimmed();
+        if (query.isEmpty()) query = "minecraft";
+        clearCards();
+        api->getMods(query, SortOrder::downloads, 0, 30);
+    });
 
-    connect(api,
-            &ModrithAPI::ModList,
-            this,
-            [this](const QVector<Mod>& mods)
-            {
-                cachedMods = mods;
+    connect(api, &ModrithAPI::ModList, this, &ModWindow::addModCards);
+    connect(installButton, &QPushButton::clicked, this, &ModWindow::installSelectedMod);
+    connect(api, &ModrithAPI::DownloadLinks, this, &ModWindow::onDownloadLinks);
+}
 
-                modList->clear();
+void ModWindow::clearCards()
+{
+    QLayoutItem* item;
+    while ((item = cardsLayout->takeAt(0)) != nullptr) {
+        delete item->widget();
+        delete item;
+    }
+}
 
-                for(const auto& mod : mods)
-                {
-                    modList->addItem(
-                        mod.name +
-                        " | " +
-                        QString::number(mod.downloads));
+void ModWindow::addModCards(const QList<Mod>& mods)
+{
+    cachedMods = mods;
+    clearCards();
+
+    for (const auto& mod : mods) {
+        QFrame* card = new QFrame();
+        card->setFrameShape(QFrame::StyledPanel);
+        card->setStyleSheet(R"(
+            QFrame {
+                background-color: #27272A;
+                border-radius: 10px;
+                border: 1px solid #3F3F46;
+            }
+            QFrame:hover { border: 1px solid #60A5FA; }
+        )");
+        card->setFixedHeight(110);
+
+        QHBoxLayout* cardLayout = new QHBoxLayout(card);
+        cardLayout->setContentsMargins(12, 12, 12, 12);
+        cardLayout->setSpacing(12);
+
+        QLabel* iconLabel = new QLabel();
+        iconLabel->setFixedSize(72, 72);
+        iconLabel->setScaledContents(true);
+
+        if (!mod.iconURL.isEmpty()) {
+            QNetworkReply* reply = api->manager.get(QNetworkRequest(mod.iconURL));
+            connect(reply, &QNetworkReply::finished, iconLabel, [iconLabel, reply]() {
+                QByteArray data = reply->readAll();
+                QPixmap pix;
+                if (pix.loadFromData(data)) {
+                    iconLabel->setPixmap(pix.scaled(72, 72, Qt::KeepAspectRatio, Qt::SmoothTransformation));
                 }
+                reply->deleteLater();
             });
-    connect(modList,
-            &QListWidget::itemDoubleClicked,
-            this,
-            [this](QListWidgetItem*)
-            {
-                int row =
-                    modList->currentRow();
+        }
 
-                if(row < 0 ||
-                    row >= cachedMods.size())
-                    return;
+        QVBoxLayout* infoLayout = new QVBoxLayout();
+        QLabel* nameLabel = new QLabel("<b>" + mod.name + "</b>");
+        QLabel* descLabel = new QLabel(mod.description.left(150) + "...");
+        descLabel->setWordWrap(true);
+        QLabel* statsLabel = new QLabel(QString("↓ %1").arg(mod.downloads));
 
-                ModDetailsWindow dlg(
-                    cachedMods[row],
-                    this);
+        infoLayout->addWidget(nameLabel);
+        infoLayout->addWidget(descLabel);
+        infoLayout->addWidget(statsLabel);
 
-                dlg.exec();
-            });
-    connect(modList,
-            &QListWidget::currentRowChanged,
-            this,
-            [this](int row)
-            {
-                if(row < 0 ||
-                    row >= cachedMods.size())
-                    return;
+        cardLayout->addWidget(iconLabel);
+        cardLayout->addLayout(infoLayout, 1);
 
-                const Mod& mod =
-                    cachedMods[row];
+        cardsLayout->addWidget(card);
+        card->setProperty("modId", mod.id);
+        card->installEventFilter(this);
+    }
+}
 
-                descriptionLabel->setText(
-                    "<b>" +
-                    mod.name +
-                    "</b><br><br>" +
-                    mod.description);
-            });
+bool ModWindow::eventFilter(QObject* obj, QEvent* event)
+{
+    if (event->type() == QEvent::MouseButtonPress) {
+        if (QFrame* card = qobject_cast<QFrame*>(obj)) {
+            // Здесь можно отметить выбранную карточку
+            qDebug() << "Выбрана карточка:" << card->property("modName").toString();
+        }
+    }
+    return QDialog::eventFilter(obj, event);
+}
 
-    connect(installButton,
-            &QPushButton::clicked,
-            this,
-            [this]()
-            {
-                int row =
-                    modList->currentRow();
+void ModWindow::installSelectedMod()
+{
+    if (cachedMods.isEmpty()) return;
+    api->getDownloadLinks(cachedMods.first().id, "1.21.1", "");
+}
 
-                if(row < 0 ||
-                    row >= cachedMods.size())
-                    return;
+void ModWindow::onDownloadLinks(const QVector<QUrl>& urls)
+{
+    if (urls.isEmpty()) {
+        QMessageBox::warning(this, "Ошибка", "Не найдено файлов");
+        return;
+    }
 
-                const Mod& mod =
-                    cachedMods[row];
+    QUrl url = urls.first();
+    QString modsPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/.minecraft/mods";
+    QDir().mkpath(modsPath);
 
-                QMessageBox::information(
-                    this,
-                    "Мод",
-                    "Выбран мод:\n" +
-                        mod.name);
+    QString fileName = QFileInfo(url.path()).fileName();
+    if (fileName.isEmpty()) fileName = "mod.jar";
 
-                // позже:
-                // api->getDownloadLinks(...)
-            });
+    QString savePath = modsPath + "/" + fileName;
 
-    connect(api,
-            &ModrithAPI::OnError,
-            this,
-            [this](const QString& err)
-            {
-                QMessageBox::warning(
-                    this,
-                    "Ошибка",
-                    err);
-            });
+    QNetworkReply* reply = api->manager.get(QNetworkRequest(url));
+
+    connect(reply, &QNetworkReply::finished, this, [=]() {
+        reply->deleteLater();
+        if (reply->error() != QNetworkReply::NoError) {
+            QMessageBox::warning(this, "Ошибка", reply->errorString());
+            return;
+        }
+
+        QFile file(savePath);
+        if (file.open(QIODevice::WriteOnly)) {
+            file.write(reply->readAll());
+            file.close();
+            QMessageBox::information(this, "Успех", "Мод установлен:\n" + fileName);
+        }
+    });
 }

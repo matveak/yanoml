@@ -33,19 +33,21 @@ public:
     void downloadVanillaVersion(const QString& versionJsonUrl, const QString& outputJarPath);
     void createInstance(const QString& minecraftVersion, const QString& modLoader, const QString& modLoaderVersion, const QString& instancePath);
 
+
 signals:
     void vanillaVersionsReceived(const QVector<MinecraftVersion>& versions);
     void fabricVersionsReceived(const QJsonArray& versions);
     void forgeVersionsReceived(const QJsonObject& promotions);
     void neoforgeVersionReceived(const QString& latestVersion);
-
+    void totalProgress(int percent);
     void fileDownloaded(const QString& filePath);
     void downloadProgress(qint64 bytesReceived, qint64 bytesTotal);
     void errorOccurred(const QString& errorString);
     void instanceCreated(QString path);
 private:
     QNetworkAccessManager manager;
-
+    int totalFiles = 0;
+    int completedFiles = 0;
     void handleVanillaManifest(QNetworkReply* reply);
     void handleFabricManifest(QNetworkReply* reply);
     void handleForgeManifest(QNetworkReply* reply);

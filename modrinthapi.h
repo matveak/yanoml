@@ -102,11 +102,11 @@ signals:
     void ModList(const QVector<Mod>& mods);
 
     void DownloadLinks(const QVector<QUrl>& urls);
-
     void OnError(const QString& error);
+public:
+    QNetworkAccessManager manager;
 
 private:
-    QNetworkAccessManager manager;
 
     QString apiUrl =
         "https://api.modrinth.com/v2";

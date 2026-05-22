@@ -13,6 +13,7 @@ MinecraftDownloader::MinecraftDownloader(QObject* parent)
 
 void MinecraftDownloader::fetchVanillaVersions()
 {
+    qDebug() << "Requesting versions...";
     QUrl url("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json");
     QNetworkReply* reply = manager.get(QNetworkRequest(url));
 
@@ -66,6 +67,8 @@ void MinecraftDownloader::handleVanillaManifest(QNetworkReply* reply)
 
         versions.push_back(ver);
     }
+    qDebug() << "Loaded versions:"
+             << versions.size();
 
     emit vanillaVersionsReceived(
         versions);
@@ -74,27 +77,58 @@ void MinecraftDownloader::handleVanillaManifest(QNetworkReply* reply)
 // ==================== FABRIC ====================
 void MinecraftDownloader::fetchFabricVersions()
 {
-    QUrl url("https://meta.fabricmc.net/v2/versions/loader");
-    QNetworkReply* reply = manager.get(QNetworkRequest(url));
+    qDebug() << "Request Fabric versions";
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
-        reply->deleteLater();
-        if (reply->error() != QNetworkReply::NoError) {
-            emit errorOccurred(reply->errorString());
-            return;
-        }
-        emit fabricVersionsReceived(QJsonDocument::fromJson(reply->readAll()).array());
-    });
+    QNetworkReply* reply =
+        manager.get(
+            QNetworkRequest(
+                QUrl("https://meta.fabricmc.net/v2/versions/game")));
+
+    connect(reply,
+            &QNetworkReply::finished,
+            this,
+            [this, reply]()
+            {
+                QByteArray data = reply->readAll();
+
+                if(reply->error() != QNetworkReply::NoError)
+                {
+                    emit errorOccurred(
+                        reply->errorString());
+
+                    reply->deleteLater();
+                    return;
+                }
+
+                QJsonDocument doc =
+                    QJsonDocument::fromJson(data);
+
+                if(!doc.isArray())
+                {
+                    emit errorOccurred(
+                        "Fabric API returned invalid JSON");
+
+                    reply->deleteLater();
+                    return;
+                }
+
+                emit fabricVersionsReceived(
+                    doc.array());
+
+                reply->deleteLater();
+            });
 }
-
 // ==================== FORGE ====================
 void MinecraftDownloader::fetchForgeVersions()
 {
+    qDebug() << "Request Forge versions";
     QUrl url("https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json");
     QNetworkReply* reply = manager.get(QNetworkRequest(url));
 
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
         reply->deleteLater();
+        qDebug() << "Forge finished";
+        qDebug() << reply->errorString();
         if (reply->error() != QNetworkReply::NoError) {
             emit errorOccurred(reply->errorString());
             return;
@@ -106,11 +140,14 @@ void MinecraftDownloader::fetchForgeVersions()
 // ==================== NEOFORGE ====================
 void MinecraftDownloader::fetchNeoForgeVersions()
 {
+    qDebug() << "Request NeoForge versions";
     QUrl url("https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml");
     QNetworkReply* reply = manager.get(QNetworkRequest(url));
 
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
         reply->deleteLater();
+        qDebug() << "NeoForge finished";
+        qDebug() << reply->errorString();
         if (reply->error() != QNetworkReply::NoError) {
             emit errorOccurred(reply->errorString());
             return;
@@ -179,256 +216,116 @@ void MinecraftDownloader::downloadVanillaVersion(const QString& versionJsonUrl, 
     });
 }
 
-void MinecraftDownloader::createInstance(const QString& minecraftVersion, const QString& modLoader, const QString& modLoaderVersion, const QString& instancePath){
-    // =====================================================
-    // CREATE DIRECTORIES
-    // =====================================================
+void MinecraftDownloader::createInstance(const QString& minecraftVersion,
+                                         const QString& modLoader,
+                                         const QString& modLoaderVersion,
+                                         const QString& instancePath)
+{
+    QDir dir(instancePath);
+    if (!dir.exists())
+        dir.mkpath(".");
 
-    QDir dir;
+    emit downloadProgress(0, 100);
 
-    dir.mkpath(instancePath);
-    dir.mkpath(instancePath + "/versions");
-    dir.mkpath(instancePath + "/libraries");
-    dir.mkpath(instancePath + "/assets");
-    dir.mkpath(instancePath + "/mods");
-
-    // =====================================================
-    // DOWNLOAD VERSION MANIFEST
-    // =====================================================
-
-    QUrl manifestUrl(
-        "https://piston-meta.mojang.com/"
-        "mc/game/version_manifest_v2.json"
-        );
+    // ==================== 1. Скачиваем version.json ====================
+    QUrl manifestUrl("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json");
 
     QNetworkReply* manifestReply = manager.get(QNetworkRequest(manifestUrl));
 
-    connect(manifestReply,&QNetworkReply::finished,this,[=](){
-        QByteArray manifestData =
-            manifestReply->readAll();
-
+    connect(manifestReply, &QNetworkReply::finished, this, [=]() {
         manifestReply->deleteLater();
 
-        if(manifestReply->error() !=
-            QNetworkReply::NoError)
-        {
-            emit errorOccurred(
-                manifestReply->errorString()
-                );
-
+        if (manifestReply->error() != QNetworkReply::NoError) {
+            emit errorOccurred("Не удалось скачать манифест версий: " + manifestReply->errorString());
             return;
         }
 
-        QJsonDocument manifestDoc =
-            QJsonDocument::fromJson(
-                manifestData
-                );
+        QJsonDocument doc = QJsonDocument::fromJson(manifestReply->readAll());
+        QJsonArray versions = doc.object()["versions"].toArray();
 
-        QJsonArray versions =
-            manifestDoc.object()
-                ["versions"]
-                    .toArray();
+        QString versionUrl;
 
-        QString versionJsonUrl;
-
-        for(const auto& v : versions)
-        {
-            QJsonObject obj =
-                v.toObject();
-
-            if(obj["id"].toString() ==
-                minecraftVersion)
-            {
-                versionJsonUrl =
-                    obj["url"].toString();
-
+        for (const auto& v : versions) {
+            QJsonObject obj = v.toObject();
+            if (obj["id"].toString() == minecraftVersion) {
+                versionUrl = obj["url"].toString();
                 break;
             }
         }
 
-        if(versionJsonUrl.isEmpty())
-        {
-            emit errorOccurred(
-                "Minecraft version not found"
-                );
-
+        if (versionUrl.isEmpty()) {
+            emit errorOccurred("Версия " + minecraftVersion + " не найдена");
             return;
         }
 
-        // =============================================
-        // DOWNLOAD VERSION JSON
-        // =============================================
+        // ==================== 2. Скачиваем client.json ====================
+        QNetworkReply* versionReply = manager.get(QNetworkRequest(QUrl(versionUrl)));
 
-        QNetworkReply* versionReply =
-            manager.get(
-                QNetworkRequest(
-                    QUrl(versionJsonUrl)
-                    )
-                );
+        connect(versionReply, &QNetworkReply::finished, this, [=]() {
+            versionReply->deleteLater();
 
-        connect(versionReply,
-                &QNetworkReply::finished,
-                this,
-                [=]()
-                {
-                    QByteArray versionData =
-                        versionReply->readAll();
+            if (versionReply->error() != QNetworkReply::NoError) {
+                emit errorOccurred(versionReply->errorString());
+                return;
+            }
 
-                    versionReply->deleteLater();
+            QJsonDocument verDoc = QJsonDocument::fromJson(versionReply->readAll());
+            QJsonObject verObj = verDoc.object();
 
-                    if(versionReply->error() !=
-                        QNetworkReply::NoError)
-                    {
-                        emit errorOccurred(
-                            versionReply->errorString()
-                            );
+            // Скачиваем client.jar
+            QString clientUrl = verObj["downloads"].toObject()["client"].toObject()["url"].toString();
+            QString clientPath = instancePath + "/versions/" + minecraftVersion + "/" + minecraftVersion + ".jar";
 
-                        return;
+            QDir().mkpath(instancePath + "/versions/" + minecraftVersion);
+
+            if (!clientUrl.isEmpty()) {
+                downloadFile(QUrl(clientUrl), clientPath);
+            }
+
+            // Скачиваем библиотеки
+            QJsonArray libraries = verObj["libraries"].toArray();
+            for (const auto& lib : libraries) {
+                QJsonObject libObj = lib.toObject();
+                QJsonObject downloads = libObj["downloads"].toObject();
+                if (downloads.contains("artifact")) {
+                    QJsonObject artifact = downloads["artifact"].toObject();
+                    QString url = artifact["url"].toString();
+                    QString path = artifact["path"].toString();
+
+                    if (!url.isEmpty() && !path.isEmpty()) {
+                        QString fullPath = instancePath + "/libraries/" + path;
+                        QDir().mkpath(QFileInfo(fullPath).path());
+                        downloadFile(QUrl(url), fullPath);
                     }
+                }
+            }
 
-                    QJsonDocument versionDoc =
-                        QJsonDocument::fromJson(
-                            versionData
-                            );
+            // ==================== 3. Установка загрузчика ====================
+            if (modLoader == "fabric") {
+                QString fabricUrl = QString("https://meta.fabricmc.net/v2/versions/loader/%1/%2/profile/json")
+                .arg(minecraftVersion, modLoaderVersion.isEmpty() ? "latest" : modLoaderVersion);
 
-                    QJsonObject versionObj =
-                        versionDoc.object();
+                QString fabricJsonPath = instancePath + "/versions/" + minecraftVersion + "-fabric/" + minecraftVersion + "-fabric.json";
+                QDir().mkpath(QFileInfo(fabricJsonPath).path());
+                downloadFile(QUrl(fabricUrl), fabricJsonPath);
+            }
+            else if (modLoader == "forge" || modLoader == "neoforge") {
+                QString loaderName = (modLoader == "forge") ? "forge" : "neoforge";
+                QString versionStr = modLoaderVersion.isEmpty() ? minecraftVersion : modLoaderVersion;
 
-                    // =========================================
-                    // DOWNLOAD CLIENT JAR
-                    // =========================================
+                QString installerUrl = (modLoader == "forge") ?
+                                           QString("https://maven.minecraftforge.net/net/minecraftforge/forge/%1-%2/forge-%1-%2-installer.jar")
+                                               .arg(minecraftVersion, versionStr) :
+                                           QString("https://maven.neoforged.net/releases/net/neoforged/neoforge/%1/neoforge-%1-installer.jar")
+                                               .arg(versionStr);
 
-                    QString clientUrl =
-                        versionObj["downloads"]
-                            .toObject()["client"]
-                            .toObject()["url"]
-                            .toString();
+                QString installerPath = instancePath + "/" + loaderName + "-installer.jar";
+                downloadFile(QUrl(installerUrl), installerPath);
 
-                    QString clientJarPath =
-                        instancePath +
-                        "/versions/" +
-                        minecraftVersion +
-                        ".jar";
+                emit errorOccurred("Установщик " + loaderName.toUpper() + " скачан.\nЗапустите его вручную для завершения установки.");
+            }
 
-                    downloadFile(
-                        QUrl(clientUrl),
-                        clientJarPath
-                        );
-
-                    // =========================================
-                    // DOWNLOAD LIBRARIES
-                    // =========================================
-
-                    QJsonArray libraries =
-                        versionObj["libraries"]
-                            .toArray();
-
-                    for(const auto& l : libraries)
-                    {
-                        QJsonObject lib =
-                            l.toObject();
-
-                        if(!lib.contains("downloads"))
-                            continue;
-
-                        QJsonObject artifact =
-                            lib["downloads"]
-                                .toObject()["artifact"]
-                                .toObject();
-
-                        QString url =
-                            artifact["url"]
-                                .toString();
-
-                        QString path =
-                            artifact["path"]
-                                .toString();
-
-                        if(url.isEmpty())
-                            continue;
-
-                        QString fullPath =
-                            instancePath +
-                            "/libraries/" +
-                            path;
-
-                        QFileInfo info(fullPath);
-
-                        dir.mkpath(
-                            info.path()
-                            );
-
-                        downloadFile(
-                            QUrl(url),
-                            fullPath
-                            );
-                    }
-
-                    // =========================================
-                    // FABRIC
-                    // =========================================
-
-                    if(modLoader == "fabric")
-                    {
-                        QString fabricMetaUrl =
-                            "https://meta.fabricmc.net/"
-                            "v2/versions/loader/" +
-                            minecraftVersion +
-                            "/" +
-                            modLoaderVersion +
-                            "/profile/json";
-
-                        downloadFile(
-                            QUrl(fabricMetaUrl),
-                            instancePath +
-                                "/fabric-loader.json"
-                            );
-                    }
-
-                    // =========================================
-                    // FORGE
-                    // =========================================
-
-                    else if(modLoader == "forge")
-                    {
-                        QString forgeInstallerUrl =
-                            "https://maven.minecraftforge.net/"
-                            "net/minecraftforge/forge/" +
-                            minecraftVersion +
-                            "-" +
-                            modLoaderVersion +
-                            "/forge-" +
-                            minecraftVersion +
-                            "-" +
-                            modLoaderVersion +
-                            "-installer.jar";
-
-                        downloadFile(
-                            QUrl(forgeInstallerUrl),
-                            instancePath +
-                                "/forge-installer.jar"
-                            );
-                    }
-
-                    // =========================================
-                    // NEOFORGE
-                    // =========================================
-
-                    else if(modLoader == "neoforge")
-                    {
-                        QString neoForgeUrl =
-                            "https://maven.neoforged.net/"
-                            "releases/net/neoforged/"
-                            "neoforge/" +
-                            modLoaderVersion +
-                            "/neoforge-" +
-                            modLoaderVersion +
-                            "-installer.jar";
-
-                        downloadFile(QUrl(neoForgeUrl), instancePath + "/neoforge-installer.jar");
-                    }
-
-                    emit instanceCreated(instancePath);
-                });
+            emit instanceCreated(instancePath);
+        });
     });
 }

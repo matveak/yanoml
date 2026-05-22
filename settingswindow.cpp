@@ -37,7 +37,6 @@ SettingsWindow::SettingsWindow(QWidget* parent)
         new QLabel(
             "Оперативная память: 1024 МБ",
             this);
-
     ramSlider =
         new QSlider(
             Qt::Horizontal,
