@@ -1,102 +1,91 @@
 #include "settingswindow.h"
-
 #include <QVBoxLayout>
 #include <QCheckBox>
 #include <QSlider>
 #include <QLabel>
 #include <QPushButton>
-
-
-SettingsWindow::~SettingsWindow()
-{
-}
+#include <QLineEdit>
+#include <QFileDialog>
+#include <QSettings>
 
 SettingsWindow::SettingsWindow(QWidget* parent)
     : QDialog(parent)
 {
     setWindowTitle("Настройки");
-    resize(400, 250);
+    resize(450, 320);
 
-    auto* layout =
-        new QVBoxLayout(this);
+    auto* layout = new QVBoxLayout(this);
 
-    snapshotsCheckBox =
-        new QCheckBox(
-            "Показывать снапшоты",
-            this);
+    // Снапшоты
+    snapshotsCheckBox = new QCheckBox("Показывать снапшоты", this);
 
-    connect(snapshotsCheckBox,
-            &QCheckBox::stateChanged,
-            this,
-            [this](int)
-            {
-                emit settingsChanged();
-            });
-
-    ramLabel =
-        new QLabel(
-            "Оперативная память: 1024 МБ",
-            this);
-    ramSlider =
-        new QSlider(
-            Qt::Horizontal,
-            this);
-
+    // Память
+    ramLabel = new QLabel("Оперативная память: 1024 МБ", this);
+    ramSlider = new QSlider(Qt::Horizontal, this);
     ramSlider->setMinimum(1);
     ramSlider->setMaximum(32);
-    ramSlider->setValue(1);
+    ramSlider->setValue(2); // 2 ГБ по умолчанию
 
-    connect(ramSlider,
-            &QSlider::valueChanged,
-            this,
-            [this](int value)
-            {
-                int ramMb =
-                    value * 1024;
+    // Путь к Minecraft
+    QLabel* pathLabel = new QLabel("Путь к Minecraft:", this);
+    pathEdit = new QLineEdit(this);
+    browseButton = new QPushButton("Обзор...", this);
 
-                ramLabel->setText(
-                    QString(
-                        "Оперативная память: %1 ГБ (%2 МБ)")
-                        .arg(value)
-                        .arg(ramMb));
+    // Загружаем сохранённый путь
+    QSettings settings("MyLauncher", "Crack");
+    pathEdit->setText(settings.value("minecraftPath",
+                                     "C:/Users/" + qgetenv("USERNAME") + "/AppData/Roaming/.minecraft").toString());
 
-                emit settingsChanged();
-            });
+    connect(browseButton, &QPushButton::clicked, this, [this]() {
+        QString dir = QFileDialog::getExistingDirectory(this, "Выберите папку Minecraft");
+        if (!dir.isEmpty()) {
+            pathEdit->setText(dir);
+            emit settingsChanged();
+        }
+    });
 
-    QPushButton* closeButton =
-        new QPushButton(
-            "Закрыть",
-            this);
+    connect(ramSlider, &QSlider::valueChanged, this, [this](int value) {
+        ramLabel->setText(QString("Оперативная память: %1 ГБ").arg(value));
+        emit settingsChanged();
+    });
 
-    connect(closeButton,
-            &QPushButton::clicked,
-            this,
-            &QDialog::accept);
+    connect(snapshotsCheckBox, &QCheckBox::stateChanged, this, [this](int) {
+        emit settingsChanged();
+    });
 
-    layout->addWidget(
-        snapshotsCheckBox);
+    // Кнопка закрытия
+    QPushButton* closeButton = new QPushButton("Сохранить и закрыть", this);
 
-    layout->addWidget(
-        ramLabel);
-
-    layout->addWidget(
-        ramSlider);
-
+    layout->addWidget(snapshotsCheckBox);
+    layout->addWidget(ramLabel);
+    layout->addWidget(ramSlider);
+    layout->addWidget(pathLabel);
+    layout->addWidget(pathEdit);
+    layout->addWidget(browseButton);
     layout->addStretch();
+    layout->addWidget(closeButton);
 
-    layout->addWidget(
-        closeButton);
+    connect(closeButton, &QPushButton::clicked, this, [this]() {
+        // Сохраняем путь
+        QSettings settings("MyLauncher", "Crack");
+        settings.setValue("minecraftPath", pathEdit->text());
+        accept();
+    });
 }
+
+SettingsWindow::~SettingsWindow() = default;
 
 bool SettingsWindow::showSnapshots() const
 {
-    return snapshotsCheckBox &&
-           snapshotsCheckBox->isChecked();
+    return snapshotsCheckBox && snapshotsCheckBox->isChecked();
 }
 
 int SettingsWindow::ramAmount() const
 {
-    return ramSlider
-               ? ramSlider->value() * 1024
-               : 1024;
+    return ramSlider ? ramSlider->value() * 1024 : 2048;
+}
+
+QString SettingsWindow::minecraftPath() const
+{
+    return pathEdit ? pathEdit->text() : "";
 }

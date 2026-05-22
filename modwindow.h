@@ -1,15 +1,19 @@
 #pragma once
 
-#include "modrinthapi.h"
 #include <QDialog>
 #include <QVector>
+#include <QUrl>
 #include <QEvent>
+
+#include "modrinthapi.h"
 
 class QLineEdit;
 class QPushButton;
 class QScrollArea;
 class QWidget;
 class QVBoxLayout;
+class QComboBox;
+class SettingsWindow;
 
 class ModWindow : public QDialog
 {
@@ -18,25 +22,50 @@ class ModWindow : public QDialog
 public:
     explicit ModWindow(QWidget *parent = nullptr);
 
-protected:
-    bool eventFilter(QObject* obj, QEvent* event) override;
+    void setSettingsWindow(SettingsWindow* sw)
+    {
+        settingsWindow = sw;
+    }
 
-private slots: // QVector
-    void onDownloadLinks(const QVector<QUrl>& urls);
+    void setMinecraftVersion(const QString& version);
+
+protected:
+    bool eventFilter(QObject* obj,
+                     QEvent* event) override;
+
+private slots:
+    void onDownloadLinks(
+        const QVector<QUrl>& urls);
+
+    void applyFilters();
+private:
+    QString selectedModId;
+    QString selectedLoader;
+private:
+    void clearCards();
+
+    void addModCards(
+        const QList<Mod>& mods);
+
+    void installSelectedMod();
 
 private:
+    QString minecraftVersion;
+
     QLineEdit* searchEdit = nullptr;
     QPushButton* searchButton = nullptr;
+
     QScrollArea* scrollArea = nullptr;
     QWidget* cardsWidget = nullptr;
     QVBoxLayout* cardsLayout = nullptr;
+
     QPushButton* installButton = nullptr;
 
+    QComboBox* versionFilter = nullptr;
+    QComboBox* loaderFilter = nullptr;
+
     ModrithAPI* api = nullptr;
+    SettingsWindow* settingsWindow = nullptr;
 
     QVector<Mod> cachedMods;
-
-    void clearCards();
-    void addModCards(const QList<Mod>& mods);
-    void installSelectedMod();
 };

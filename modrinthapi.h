@@ -88,6 +88,8 @@ public:
     explicit ModrithAPI(QObject* parent = nullptr);
 
     void getMods(QString query,
+                 QString mcVersion = "",
+                 QString loader = "",
                  SortOrder order = SortOrder::relevance,
                  int first = 0,
                  int count = 10);

@@ -23,6 +23,7 @@ public:
     ~MainWindow();
 
 private slots:
+//    void on_CreateModpackButton_clicked();
     void onLoaderChanged(const QString& loader);
     void onShowSnapshotsChanged(int state);
 

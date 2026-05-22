@@ -1,6 +1,9 @@
 #include "modrinthapi.h"
 
 #include <QJsonParseError>
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QJsonObject>
 #include <QDebug>
 #include <algorithm>
 
@@ -34,6 +37,8 @@ QString Order2String(SortOrder order)
 }
 
 void ModrithAPI::getMods(QString query,
+                         QString mcVersion,
+                         QString loader,
                          SortOrder order,
                          int first,
                          int count)
@@ -57,6 +62,38 @@ void ModrithAPI::getMods(QString query,
     q.addQueryItem(
         "limit",
         QString::number(count));
+
+    // =====================
+    // Фильтры Modrinth
+    // =====================
+
+    QJsonArray facets;
+    QJsonArray group;
+
+    if(!mcVersion.isEmpty())
+    {
+        group.append(
+            QString("versions:%1")
+                .arg(mcVersion));
+    }
+
+    if(!loader.isEmpty())
+    {
+        group.append(
+            QString("categories:%1")
+                .arg(loader));
+    }
+
+    if(!group.isEmpty())
+    {
+        facets.append(group);
+
+        q.addQueryItem(
+            "facets",
+            QString::fromUtf8(
+                QJsonDocument(facets)
+                    .toJson(QJsonDocument::Compact)));
+    }
 
     url.setQuery(q);
 
@@ -370,6 +407,7 @@ void ModrithAPI::getDownloadLinks(
             emit DownloadLinks(links);
         });
 }
+
 void ModrithAPI::getProject(QString slug)
 {
     QUrl url(

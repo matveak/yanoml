@@ -17,6 +17,8 @@ struct MinecraftVersion
 
     QString url;
     QString releaseTime;
+
+    QString type;
 };
 class MinecraftDownloader : public QObject
 {

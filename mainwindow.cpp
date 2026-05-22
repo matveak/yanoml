@@ -4,15 +4,19 @@
 #include <QVersionNumber>
 #include <algorithm>
 #include <QDir>
+//#include "createmodpackwindow.h"
 
-static bool versionGreater(const MinecraftVersion& a,
-                           const MinecraftVersion& b)
+
+
+
+
+static bool versionGreater(const MinecraftVersion& a,const MinecraftVersion& b)
 {
     return QVersionNumber::fromString(a.gameVersion) >
            QVersionNumber::fromString(b.gameVersion);
 }
-MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent)
+
+MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 {
     progressBar = new QProgressBar(this);
 
@@ -174,9 +178,8 @@ void MainWindow::on_ModPlatformButton_clicked()
     qDebug() << "OPEN MODS";
 
     ModWindow window(this);
+    window.setSettingsWindow(settingsWindow);   // ← Важная строка!
     window.exec();
-
-    qDebug() << "MODS CLOSED";
 }
 
 void MainWindow::on_UpdateButton_clicked()
@@ -273,6 +276,16 @@ void MainWindow::on_ElyByButton_clicked()
     elyAuth->grant();
 }
 
+// void MainWindow::on_CreateModpackButton_clicked()
+// {
+//     CreateModpackWindow window(this);
+
+//     window.setDownloader(downloader);
+//     window.setSettingsWindow(settingsWindow);
+
+//     window.exec();
+// }
+
 void MainWindow::on_SettingsButton_clicked(){
     settingsWindow->exec();
 }
@@ -361,8 +374,7 @@ void MainWindow::onFabricVersionsReceived(const QJsonArray& versions)
              << VersionBox->count();
 }
 
-void MainWindow::onForgeVersionsReceived(
-    const QJsonObject& json)
+void MainWindow::onForgeVersionsReceived(const QJsonObject& json)
 {
     VersionBox->clear();
 
@@ -503,8 +515,23 @@ void MainWindow::onShowSnapshotsChanged(int state)
 
 void MainWindow::loadVersions()
 {
+    QPushButton* createModpackButton =
+        new QPushButton(
+            "Создать сборку",
+            centralwidget);
+
+    createModpackButton->setGeometry(
+        QRect(780, 680, 250, 30));
+
+    // connect(
+    //     createModpackButton,
+    //     &QPushButton::clicked,
+    //     this,
+    //     &MainWindow::on_CreateModpackButton_clicked);
+
     if(!LoaderBox)
     {
+
         LoaderBox = new QComboBox(centralwidget);
 
         LoaderBox->setGeometry(
