@@ -4,6 +4,8 @@
 #include <QVersionNumber>
 #include <algorithm>
 #include <QDir>
+#include <QProcess>
+#include <QFileInfo>
 //#include "createmodpackwindow.h"
 
 
@@ -18,6 +20,7 @@ static bool versionGreater(const MinecraftVersion& a,const MinecraftVersion& b)
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 {
+
     progressBar = new QProgressBar(this);
 
     progressBar->setGeometry(
@@ -168,9 +171,190 @@ void MainWindow::onLoaderChanged(const QString& loader)
 
 void MainWindow::on_PlayButton_clicked()
 {
-    QMessageBox::information(this, "Запуск",
-                             "Запускаем: " + VersionBox->currentText());
-    // Здесь позже будет код запуска игры
+    QString gameDir =
+        settingsWindow->minecraftPath();
+
+    if(gameDir.isEmpty())
+    {
+        QMessageBox::warning(
+            this,
+            "Ошибка",
+            "Не указана папка Minecraft");
+
+        return;
+    }
+
+    QString version =
+        VersionBox->currentText();
+
+    if(version.startsWith("Fabric "))
+        version.remove("Fabric ");
+
+    if(version.startsWith("Forge "))
+        version.remove("Forge ");
+
+    if(version.startsWith("NeoForge "))
+        version.remove("NeoForge ");
+
+    QString versionDir =
+        gameDir +
+        "/versions/" +
+        version;
+
+    QString jsonPath =
+        versionDir +
+        "/" +
+        version +
+        ".json";
+
+    QString jarPath =
+        versionDir +
+        "/" +
+        version +
+        ".jar";
+
+    if(!QFileInfo::exists(jsonPath))
+    {
+        QMessageBox::warning(
+            this,
+            "Ошибка",
+            "Не найден файл версии:\n" +
+                jsonPath);
+
+        return;
+    }
+
+    QFile jsonFile(jsonPath);
+
+    if(!jsonFile.open(QIODevice::ReadOnly))
+    {
+        QMessageBox::warning(
+            this,
+            "Ошибка",
+            "Не удалось открыть version json");
+
+        return;
+    }
+
+    QJsonDocument doc =
+        QJsonDocument::fromJson(
+            jsonFile.readAll());
+
+    jsonFile.close();
+
+    QJsonObject root =
+        doc.object();
+
+    QString mainClass =
+        root["mainClass"]
+            .toString();
+
+    if(mainClass.isEmpty())
+    {
+        QMessageBox::warning(
+            this,
+            "Ошибка",
+            "mainClass отсутствует");
+
+        return;
+    }
+
+#ifdef Q_OS_WIN
+    QString separator = ";";
+#else
+    QString separator = ":";
+#endif
+
+    QString classPath;
+
+    QJsonArray libraries =
+        root["libraries"]
+            .toArray();
+
+    for(const auto& value : libraries)
+    {
+        QJsonObject lib =
+            value.toObject();
+
+        QJsonObject downloads =
+            lib["downloads"]
+                .toObject();
+
+        if(!downloads.contains("artifact"))
+            continue;
+
+        QJsonObject artifact =
+            downloads["artifact"]
+                .toObject();
+
+        QString path =
+            artifact["path"]
+                .toString();
+
+        if(path.isEmpty())
+            continue;
+
+        QString fullPath =
+            gameDir +
+            "/libraries/" +
+            path;
+
+        if(QFileInfo::exists(fullPath))
+        {
+            if(!classPath.isEmpty())
+                classPath += separator;
+
+            classPath += fullPath;
+        }
+    }
+
+    if(!classPath.isEmpty())
+        classPath += separator;
+
+    classPath += jarPath;
+
+    QString javaPath =
+        QDir::toNativeSeparators(
+            QCoreApplication::applicationDirPath() +
+            "/java/bin/javaw.exe");
+
+    if(!QFileInfo::exists(javaPath))
+        javaPath = "java";
+
+    QStringList args;
+
+    args
+        << "-Xms1G"
+        << "-Xmx2G"
+        << "-cp"
+        << classPath
+        << mainClass
+        << "--username" << "Player"
+        << "--version" << version
+        << "--gameDir" << gameDir
+        << "--assetsDir" << gameDir + "/assets"
+        << "--assetIndex"
+        << root["assets"].toString()
+        << "--accessToken" << "0"
+        << "--userType" << "legacy";
+
+    qDebug() << "JAVA:" << javaPath;
+    qDebug() << "MAIN:" << mainClass;
+    qDebug() << "CP:" << classPath;
+
+    bool ok =
+        QProcess::startDetached(
+            javaPath,
+            args,
+            gameDir);
+
+    if(!ok)
+    {
+        QMessageBox::critical(
+            this,
+            "Ошибка",
+            "Не удалось запустить Minecraft");
+    }
 }
 
 void MainWindow::on_ModPlatformButton_clicked()
