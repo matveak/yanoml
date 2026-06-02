@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QDialog>
+#include <QSettings>
 #include <QString>
 
 class QCheckBox;
@@ -9,26 +10,29 @@ class QSlider;
 class QLineEdit;
 class QPushButton;
 
-class SettingsWindow : public QDialog
-{
+class SettingsWindow : public QDialog{
     Q_OBJECT
 
 public:
     explicit SettingsWindow(QWidget* parent = nullptr);
-    ~SettingsWindow();
 
     bool showSnapshots() const;
     int ramAmount() const;
-    QString minecraftPath() const;   // ← Новый метод
+    QString minecraftPath() const;
+    QString javaPath() const;
 
-signals:
-    void settingsChanged();
+    signals:
+        void settingsChanged();
 
 private:
     QCheckBox* snapshotsCheckBox = nullptr;
     QSlider* ramSlider = nullptr;
     QLabel* ramLabel = nullptr;
 
-    QLineEdit* pathEdit = nullptr;      // ← Поле для пути
-    QPushButton* browseButton = nullptr; // ← Кнопка "Обзор"
+    QLineEdit* minecraftPathEdit = nullptr;
+    QPushButton* minecraftBrowseButton = nullptr;
+
+    QLineEdit* javaPathEdit = nullptr;
+    QPushButton* javaBrowseButton = nullptr;
+    QSettings settings{"MyLauncher", "Crack"};
 };

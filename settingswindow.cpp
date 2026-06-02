@@ -18,38 +18,50 @@ SettingsWindow::SettingsWindow(QWidget* parent)
 
     // Снапшоты
     snapshotsCheckBox = new QCheckBox("Показывать снапшоты", this);
+    snapshotsCheckBox->setChecked(settings.value("snapshots", false).toBool());
 
     // Память
-    ramLabel = new QLabel("Оперативная память: 1024 МБ", this);
+    ramLabel = new QLabel(this);
     ramSlider = new QSlider(Qt::Horizontal, this);
-    ramSlider->setMinimum(1);
-    ramSlider->setMaximum(32);
-    ramSlider->setValue(2); // 2 ГБ по умолчанию
-
-    // Путь к Minecraft
-    QLabel* pathLabel = new QLabel("Путь к Minecraft:", this);
-    pathEdit = new QLineEdit(this);
-    browseButton = new QPushButton("Обзор...", this);
-
-    // Загружаем сохранённый путь
-    QSettings settings("MyLauncher", "Crack");
-    pathEdit->setText(settings.value("minecraftPath",
-                                     "C:/Users/" + qgetenv("USERNAME") + "/AppData/Roaming/.minecraft").toString());
-
-    connect(browseButton, &QPushButton::clicked, this, [this]() {
-        QString dir = QFileDialog::getExistingDirectory(this, "Выберите папку Minecraft");
-        if (!dir.isEmpty()) {
-            pathEdit->setText(dir);
-            emit settingsChanged();
-        }
-    });
-
     connect(ramSlider, &QSlider::valueChanged, this, [this](int value) {
         ramLabel->setText(QString("Оперативная память: %1 ГБ").arg(value));
         emit settingsChanged();
     });
+    ramSlider->setMinimum(1);
+    ramSlider->setMaximum(32);
+    ramSlider->setValue(settings.value("minecraftRam", 2).toInt()); // 2 ГБ по умолчанию
 
-    connect(snapshotsCheckBox, &QCheckBox::stateChanged, this, [this](int) {
+    // Путь к Minecraft
+    QLabel* minecraftPathLabel = new QLabel("Путь к Minecraft:", this);
+    minecraftPathEdit = new QLineEdit(this);
+    minecraftBrowseButton = new QPushButton("Обзор...", this);
+
+    // Загружаем сохранённый путь
+    minecraftPathEdit->setText(settings.value("minecraftPath",
+                                     "C:/Users/" + qgetenv("USERNAME") + "/AppData/Roaming/.minecraft").toString());
+
+    connect(minecraftBrowseButton, &QPushButton::clicked, this, [this] {
+        QString dir = QFileDialog::getExistingDirectory(this, "Выберите папку Minecraft");
+        if (!dir.isEmpty()) {
+            minecraftPathEdit->setText(dir);
+            emit settingsChanged();
+        }
+    });
+
+    QLabel* javaPathLabel = new QLabel("Путь к Java:", this);
+    javaPathEdit = new QLineEdit(this);
+    javaBrowseButton = new QPushButton("Обзор...", this);
+    javaPathEdit->setText(settings.value("javaPath", "C:/Program Files/Java/jdk-21/").toString());
+
+    connect(javaBrowseButton, &QPushButton::clicked, this, [this]{
+        QString dir = QFileDialog::getExistingDirectory(this, "Выберите папку Java");
+        if (!dir.isEmpty()) {
+            javaPathEdit->setText(dir);
+            emit settingsChanged();
+        }
+    });
+
+    connect(snapshotsCheckBox, &QCheckBox::checkStateChanged, this, [this](Qt::CheckState) {
         emit settingsChanged();
     });
 
@@ -59,33 +71,40 @@ SettingsWindow::SettingsWindow(QWidget* parent)
     layout->addWidget(snapshotsCheckBox);
     layout->addWidget(ramLabel);
     layout->addWidget(ramSlider);
-    layout->addWidget(pathLabel);
-    layout->addWidget(pathEdit);
-    layout->addWidget(browseButton);
+    layout->addWidget(minecraftPathLabel);
+    layout->addWidget(minecraftPathEdit);
+    layout->addWidget(minecraftBrowseButton);
+    layout->addWidget(javaPathLabel);
+    layout->addWidget(javaPathEdit);
+    layout->addWidget(javaBrowseButton);
     layout->addStretch();
     layout->addWidget(closeButton);
 
     connect(closeButton, &QPushButton::clicked, this, [this]() {
         // Сохраняем путь
-        QSettings settings("MyLauncher", "Crack");
-        settings.setValue("minecraftPath", pathEdit->text());
+        settings.setValue("minecraftPath", minecraftPathEdit->text());
+        settings.setValue("javaPath", javaPathEdit->text());
+        settings.setValue("snapshots", snapshotsCheckBox->isChecked());
+        settings.setValue("minecraftRam", ramSlider->value());
         accept();
     });
 }
 
-SettingsWindow::~SettingsWindow() = default;
-
 bool SettingsWindow::showSnapshots() const
 {
-    return snapshotsCheckBox && snapshotsCheckBox->isChecked();
+    return settings.value("snapshots", false).toBool();
 }
 
 int SettingsWindow::ramAmount() const
 {
-    return ramSlider ? ramSlider->value() * 1024 : 2048;
+    return settings.value("minecraftRam", 0).toInt();
 }
 
 QString SettingsWindow::minecraftPath() const
 {
-    return pathEdit ? pathEdit->text() : "";
+    return settings.value("minecraftPath").toString();
+}
+
+QString SettingsWindow::javaPath() const{
+    return settings.value("javaPath").toString() + "/bin/javaw.exe";
 }

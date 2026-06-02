@@ -27,7 +27,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     loadVersions();
 }
 
-MainWindow::~MainWindow() = default;
 
 void MainWindow::setupConnections()
 {
@@ -168,8 +167,10 @@ void MainWindow::on_PlayButton_clicked()
     if (!classPath.isEmpty()) classPath += separator;
     classPath += versionDir + "/" + version + ".jar";
 
-    // === Java Path (приоритет bundled Java) ===
-    QString javaPath = QDir::toNativeSeparators(QCoreApplication::applicationDirPath() + "/java/bin/javaw.exe");
+    QString javaPath = settingsWindow->javaPath();
+    if (javaPath.isEmpty()) {
+        javaPath = QDir::toNativeSeparators(QCoreApplication::applicationDirPath() + "/java/bin/javaw.exe");
+    }
 
     if (!QFileInfo::exists(javaPath)) {
         javaPath = "javaw";  // системный
@@ -190,12 +191,6 @@ void MainWindow::on_PlayButton_clicked()
         "--accessToken", "0",
         "--userType", "legacy"
     };
-
-    qDebug() << "=== ЗАПУСК ===";
-    qDebug() << "Java:" << javaPath;
-    qDebug() << "Natives:" << nativesPath;
-    qDebug() << "Version:" << version;
-    qDebug() << "MainClass:" << mainClass;
 
     QThread* thread = new QThread;
     connect(thread, &QThread::finished, thread, &QThread::deleteLater);
