@@ -28,28 +28,16 @@ public:
     }
 
     void setMinecraftVersion(const QString& version);
-
-protected:
-    bool eventFilter(QObject* obj,
-                     QEvent* event) override;
-
 private slots:
     void onDownloadLinks(
         const QVector<QUrl>& urls);
 
     void applyFilters();
+    void installMod(const Mod& mod);
 private:
-    QString selectedModId;
     QString selectedLoader;
-private:
     void clearCards();
-
-    void addModCards(
-        const QList<Mod>& mods);
-
-    void installSelectedMod();
-
-private:
+    void addModCards(const QList<Mod>& mods);
     QString minecraftVersion;
 
     QLineEdit* searchEdit = nullptr;
@@ -58,9 +46,6 @@ private:
     QScrollArea* scrollArea = nullptr;
     QWidget* cardsWidget = nullptr;
     QVBoxLayout* cardsLayout = nullptr;
-
-    QPushButton* installButton = nullptr;
-
     QComboBox* versionFilter = nullptr;
     QComboBox* loaderFilter = nullptr;
 

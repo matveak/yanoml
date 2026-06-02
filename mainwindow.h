@@ -31,7 +31,6 @@ private slots:
     void onFabricVersionsReceived(const QJsonArray& versions);
     void onForgeVersionsReceived(const QJsonObject& versions);
     void onNeoForgeVersionReceived(const QString& xml);
-
     void on_PlayButton_clicked();
     void on_ModPlatformButton_clicked();
     void on_UpdateButton_clicked();
@@ -39,8 +38,9 @@ private slots:
     void on_SettingsButton_clicked();
     void on_PickAccountButton_clicked();
     void on_InstallerButton_clicked();
-    void requestElyProfile();
+    //void requestElyProfile();
 private:
+    QProgressBar* globalProgressBar = nullptr;
     QProgressBar* progressBar = nullptr;
     QNetworkAccessManager networkManager;
     QOAuth2AuthorizationCodeFlow* elyAuth = nullptr;

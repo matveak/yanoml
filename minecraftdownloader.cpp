@@ -216,116 +216,431 @@ void MinecraftDownloader::downloadVanillaVersion(const QString& versionJsonUrl, 
     });
 }
 
-void MinecraftDownloader::createInstance(const QString& minecraftVersion,
-                                         const QString& modLoader,
-                                         const QString& modLoaderVersion,
-                                         const QString& instancePath)
+void MinecraftDownloader::createInstance(
+    const QString& minecraftVersion,
+    const QString& modLoader,
+    const QString& modLoaderVersion,
+    const QString& instancePath)
 {
-    QDir dir(instancePath);
-    if (!dir.exists())
-        dir.mkpath(".");
+    QDir().mkpath(instancePath);
 
-    emit downloadProgress(0, 100);
+    QString versionsDir =
+        instancePath + "/versions/" + minecraftVersion;
 
-    // ==================== 1. Скачиваем version.json ====================
-    QUrl manifestUrl("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json");
+    QString librariesDir =
+        instancePath + "/libraries";
 
-    QNetworkReply* manifestReply = manager.get(QNetworkRequest(manifestUrl));
+    QString assetsDir =
+        instancePath + "/assets";
 
-    connect(manifestReply, &QNetworkReply::finished, this, [=]() {
-        manifestReply->deleteLater();
+    QString indexesDir =
+        assetsDir + "/indexes";
 
-        if (manifestReply->error() != QNetworkReply::NoError) {
-            emit errorOccurred("Не удалось скачать манифест версий: " + manifestReply->errorString());
-            return;
-        }
+    QString objectsDir =
+        assetsDir + "/objects";
 
-        QJsonDocument doc = QJsonDocument::fromJson(manifestReply->readAll());
-        QJsonArray versions = doc.object()["versions"].toArray();
+    QString nativesDir =
+        instancePath + "/natives";
 
-        QString versionUrl;
+    QDir().mkpath(versionsDir);
+    QDir().mkpath(librariesDir);
+    QDir().mkpath(indexesDir);
+    QDir().mkpath(objectsDir);
+    QDir().mkpath(nativesDir);
 
-        for (const auto& v : versions) {
-            QJsonObject obj = v.toObject();
-            if (obj["id"].toString() == minecraftVersion) {
-                versionUrl = obj["url"].toString();
-                break;
-            }
-        }
+    emit totalProgress(0);
 
-        if (versionUrl.isEmpty()) {
-            emit errorOccurred("Версия " + minecraftVersion + " не найдена");
-            return;
-        }
+    // =========================
+    // VERSION MANIFEST
+    // =========================
 
-        // ==================== 2. Скачиваем client.json ====================
-        QNetworkReply* versionReply = manager.get(QNetworkRequest(QUrl(versionUrl)));
+    QUrl manifestUrl(
+        "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json");
 
-        connect(versionReply, &QNetworkReply::finished, this, [=]() {
-            versionReply->deleteLater();
+    QNetworkReply* manifestReply =
+        manager.get(QNetworkRequest(manifestUrl));
 
-            if (versionReply->error() != QNetworkReply::NoError) {
-                emit errorOccurred(versionReply->errorString());
-                return;
-            }
+    connect(manifestReply,
+            &QNetworkReply::finished,
+            this,
+            [=]()
+            {
+                manifestReply->deleteLater();
 
-            QJsonDocument verDoc = QJsonDocument::fromJson(versionReply->readAll());
-            QJsonObject verObj = verDoc.object();
+                if(manifestReply->error() != QNetworkReply::NoError)
+                {
+                    emit errorOccurred(
+                        manifestReply->errorString());
 
-            // Скачиваем client.jar
-            QString clientUrl = verObj["downloads"].toObject()["client"].toObject()["url"].toString();
-            QString clientPath = instancePath + "/versions/" + minecraftVersion + "/" + minecraftVersion + ".jar";
+                    return;
+                }
 
-            QDir().mkpath(instancePath + "/versions/" + minecraftVersion);
+                QJsonDocument manifestDoc =
+                    QJsonDocument::fromJson(
+                        manifestReply->readAll());
 
-            if (!clientUrl.isEmpty()) {
-                downloadFile(QUrl(clientUrl), clientPath);
-            }
+                QJsonArray versions =
+                    manifestDoc.object()["versions"]
+                        .toArray();
 
-            // Скачиваем библиотеки
-            QJsonArray libraries = verObj["libraries"].toArray();
-            for (const auto& lib : libraries) {
-                QJsonObject libObj = lib.toObject();
-                QJsonObject downloads = libObj["downloads"].toObject();
-                if (downloads.contains("artifact")) {
-                    QJsonObject artifact = downloads["artifact"].toObject();
-                    QString url = artifact["url"].toString();
-                    QString path = artifact["path"].toString();
+                QString versionUrl;
 
-                    if (!url.isEmpty() && !path.isEmpty()) {
-                        QString fullPath = instancePath + "/libraries/" + path;
-                        QDir().mkpath(QFileInfo(fullPath).path());
-                        downloadFile(QUrl(url), fullPath);
+                for(const auto& value : versions)
+                {
+                    QJsonObject obj =
+                        value.toObject();
+
+                    if(obj["id"].toString()
+                        == minecraftVersion)
+                    {
+                        versionUrl =
+                            obj["url"].toString();
+
+                        break;
                     }
                 }
-            }
 
-            // ==================== 3. Установка загрузчика ====================
-            if (modLoader == "fabric") {
-                QString fabricUrl = QString("https://meta.fabricmc.net/v2/versions/loader/%1/%2/profile/json")
-                .arg(minecraftVersion, modLoaderVersion.isEmpty() ? "latest" : modLoaderVersion);
+                if(versionUrl.isEmpty())
+                {
+                    emit errorOccurred(
+                        "Version not found");
 
-                QString fabricJsonPath = instancePath + "/versions/" + minecraftVersion + "-fabric/" + minecraftVersion + "-fabric.json";
-                QDir().mkpath(QFileInfo(fabricJsonPath).path());
-                downloadFile(QUrl(fabricUrl), fabricJsonPath);
-            }
-            else if (modLoader == "forge" || modLoader == "neoforge") {
-                QString loaderName = (modLoader == "forge") ? "forge" : "neoforge";
-                QString versionStr = modLoaderVersion.isEmpty() ? minecraftVersion : modLoaderVersion;
+                    return;
+                }
 
-                QString installerUrl = (modLoader == "forge") ?
-                                           QString("https://maven.minecraftforge.net/net/minecraftforge/forge/%1-%2/forge-%1-%2-installer.jar")
-                                               .arg(minecraftVersion, versionStr) :
-                                           QString("https://maven.neoforged.net/releases/net/neoforged/neoforge/%1/neoforge-%1-installer.jar")
-                                               .arg(versionStr);
+                // =========================
+                // VERSION JSON
+                // =========================
 
-                QString installerPath = instancePath + "/" + loaderName + "-installer.jar";
-                downloadFile(QUrl(installerUrl), installerPath);
+                QNetworkReply* versionReply =
+                    manager.get(
+                        QNetworkRequest(
+                            QUrl(versionUrl)));
 
-                emit errorOccurred("Установщик " + loaderName.toUpper() + " скачан.\nЗапустите его вручную для завершения установки.");
-            }
+                connect(versionReply,
+                        &QNetworkReply::finished,
+                        this,
+                        [=]()
+                        {
+                            versionReply->deleteLater();
 
-            emit instanceCreated(instancePath);
-        });
-    });
+                            if(versionReply->error()
+                                != QNetworkReply::NoError)
+                            {
+                                emit errorOccurred(
+                                    versionReply->errorString());
+
+                                return;
+                            }
+
+                            QByteArray versionData =
+                                versionReply->readAll();
+
+                            QString versionJsonPath =
+                                versionsDir + "/" +
+                                minecraftVersion +
+                                ".json";
+
+                            QFile versionFile(
+                                versionJsonPath);
+
+                            if(versionFile.open(
+                                    QIODevice::WriteOnly))
+                            {
+                                versionFile.write(
+                                    versionData);
+
+                                versionFile.close();
+                            }
+
+                            QJsonDocument versionDoc =
+                                QJsonDocument::fromJson(
+                                    versionData);
+
+                            QJsonObject root =
+                                versionDoc.object();
+
+                            // =========================
+                            // CLIENT JAR
+                            // =========================
+
+                            QString clientUrl =
+                                root["downloads"]
+                                    .toObject()["client"]
+                                    .toObject()["url"]
+                                    .toString();
+
+                            QString jarPath =
+                                versionsDir + "/" +
+                                minecraftVersion +
+                                ".jar";
+
+                            downloadFile(
+                                QUrl(clientUrl),
+                                jarPath);
+
+                            // =========================
+                            // LIBRARIES
+                            // =========================
+
+                            QJsonArray libraries =
+                                root["libraries"]
+                                    .toArray();
+
+                            totalFiles =
+                                libraries.size();
+
+                            completedFiles = 0;
+
+                            for(const auto& value
+                                 : libraries)
+                            {
+                                QJsonObject lib =
+                                    value.toObject();
+
+                                QJsonObject downloads =
+                                    lib["downloads"]
+                                        .toObject();
+
+                                // artifact
+                                if(downloads.contains(
+                                        "artifact"))
+                                {
+                                    QJsonObject artifact =
+                                        downloads["artifact"]
+                                            .toObject();
+
+                                    QString url =
+                                        artifact["url"]
+                                            .toString();
+
+                                    QString path =
+                                        artifact["path"]
+                                            .toString();
+
+                                    QString fullPath =
+                                        librariesDir +
+                                        "/" +
+                                        path;
+
+                                    QDir().mkpath(
+                                        QFileInfo(fullPath)
+                                            .path());
+
+                                    downloadFile(
+                                        QUrl(url),
+                                        fullPath);
+                                }
+
+#ifdef Q_OS_WIN
+
+                                // natives
+                                if(downloads.contains(
+                                        "classifiers"))
+                                {
+                                    QJsonObject classifiers =
+                                        downloads["classifiers"]
+                                            .toObject();
+
+                                    QString nativeKey;
+
+                                    if(classifiers.contains(
+                                            "natives-windows"))
+                                    {
+                                        nativeKey =
+                                            "natives-windows";
+                                    }
+                                    else if(classifiers.contains(
+                                                 "natives-windows-64"))
+                                    {
+                                        nativeKey =
+                                            "natives-windows-64";
+                                    }
+
+                                    if(!nativeKey.isEmpty())
+                                    {
+                                        QJsonObject nativeObj =
+                                            classifiers[nativeKey]
+                                                .toObject();
+
+                                        QString nativeUrl =
+                                            nativeObj["url"]
+                                                .toString();
+
+                                        QString nativePath =
+                                            librariesDir +
+                                            "/" +
+                                            nativeObj["path"]
+                                                .toString();
+
+                                        QDir().mkpath(
+                                            QFileInfo(nativePath)
+                                                .path());
+
+                                        downloadFile(
+                                            QUrl(nativeUrl),
+                                            nativePath);
+                                    }
+                                }
+
+#endif
+                            }
+
+                            // =========================
+                            // ASSET INDEX
+                            // =========================
+
+                            QJsonObject assetIndex =
+                                root["assetIndex"]
+                                    .toObject();
+
+                            QString assetIndexId =
+                                assetIndex["id"]
+                                    .toString();
+
+                            QString assetIndexUrl =
+                                assetIndex["url"]
+                                    .toString();
+
+                            QString assetIndexPath =
+                                indexesDir +
+                                "/" +
+                                assetIndexId +
+                                ".json";
+
+                            QNetworkReply* assetReply =
+                                manager.get(
+                                    QNetworkRequest(
+                                        QUrl(assetIndexUrl)));
+
+                            connect(assetReply,
+                                    &QNetworkReply::finished,
+                                    this,
+                                    [=]()
+                                    {
+                                        assetReply->deleteLater();
+
+                                        if(assetReply->error()
+                                            != QNetworkReply::NoError)
+                                        {
+                                            emit errorOccurred(
+                                                assetReply->errorString());
+
+                                            return;
+                                        }
+
+                                        QByteArray assetData =
+                                            assetReply->readAll();
+
+                                        QFile assetFile(
+                                            assetIndexPath);
+
+                                        if(assetFile.open(
+                                                QIODevice::WriteOnly))
+                                        {
+                                            assetFile.write(
+                                                assetData);
+
+                                            assetFile.close();
+                                        }
+
+                                        QJsonDocument assetDoc =
+                                            QJsonDocument::fromJson(
+                                                assetData);
+
+                                        QJsonObject objects =
+                                            assetDoc.object()["objects"]
+                                                .toObject();
+
+                                        int downloaded = 0;
+                                        int total =
+                                            objects.size();
+
+                                        for(auto it =
+                                             objects.begin();
+                                             it != objects.end();
+                                             ++it)
+                                        {
+                                            QString hash =
+                                                it.value()
+                                                    .toObject()["hash"]
+                                                    .toString();
+
+                                            QString subdir =
+                                                hash.left(2);
+
+                                            QString objectUrl =
+                                                "https://resources.download.minecraft.net/"
+                                                + subdir +
+                                                "/" +
+                                                hash;
+
+                                            QString objectPath =
+                                                objectsDir +
+                                                "/" +
+                                                subdir +
+                                                "/" +
+                                                hash;
+
+                                            QDir().mkpath(
+                                                QFileInfo(objectPath)
+                                                    .path());
+
+                                            QNetworkReply* objReply =
+                                                manager.get(
+                                                    QNetworkRequest(
+                                                        QUrl(objectUrl)));
+
+                                            QFile* file =
+                                                new QFile(
+                                                    objectPath);
+
+                                            file->open(
+                                                QIODevice::WriteOnly);
+
+                                            connect(
+                                                objReply,
+                                                &QNetworkReply::readyRead,
+                                                this,
+                                                [objReply, file]()
+                                                {
+                                                    file->write(
+                                                        objReply->readAll());
+                                                });
+
+                                            connect(
+                                                objReply,
+                                                &QNetworkReply::finished,
+                                                this,
+                                                [=]() mutable
+                                                {
+                                                    file->write(
+                                                        objReply->readAll());
+
+                                                    file->close();
+
+                                                    file->deleteLater();
+
+                                                    objReply->deleteLater();
+
+                                                    downloaded++;
+
+                                                    int progress =
+                                                        (downloaded * 100)
+                                                        / total;
+
+                                                    emit totalProgress(
+                                                        progress);
+
+                                                    if(downloaded
+                                                        >= total)
+                                                    {
+                                                        emit instanceCreated(
+                                                            instancePath);
+                                                    }
+                                                });
+                                        }
+                                    });
+                        });
+            });
 }

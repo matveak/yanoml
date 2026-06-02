@@ -6,258 +6,137 @@
 #include <QDir>
 #include <QProcess>
 #include <QFileInfo>
-//#include "createmodpackwindow.h"
+#include <QCoreApplication>
 
-
-
-
-
-static bool versionGreater(const MinecraftVersion& a,const MinecraftVersion& b)
-{
-    return QVersionNumber::fromString(a.gameVersion) >
-           QVersionNumber::fromString(b.gameVersion);
-}
+// ==================== MainWindow ====================
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 {
-
     progressBar = new QProgressBar(this);
-
-    progressBar->setGeometry(
-        QRect(1050, 680, 250, 25));
-
+    progressBar->setGeometry(QRect(780, 710, 500, 25));  // середина низа
     progressBar->setRange(0, 100);
     progressBar->setValue(0);
     progressBar->hide();
-    setupUi(this);                    // Загружает дизайн из .ui
+
+    setupUi(this);
     downloader = new MinecraftDownloader(this);
     settingsWindow = new SettingsWindow(this);
+
     setupConnections();
-    loadVersions();                   // Загружаем версии Minecraft
+    loadVersions();
 }
 
 MainWindow::~MainWindow() = default;
 
 void MainWindow::setupConnections()
 {
-    connect(downloader,
-            &MinecraftDownloader::downloadProgress,
-            this,
-            [this](qint64 received,
-                   qint64 total)
-            {
-                if(total <= 0)
-                    return;
-
+    connect(downloader, &MinecraftDownloader::downloadProgress, this,
+            [this](qint64 received, qint64 total) {
+                if (total <= 0) return;
                 progressBar->show();
-
-                int percent =
-                    static_cast<int>(
-                        (received * 100) / total);
-
+                int percent = static_cast<int>((received * 100) / total);
                 progressBar->setValue(percent);
             });
-    connect(
-        downloader,
-        &MinecraftDownloader::vanillaVersionsReceived,
-        this,
-        &MainWindow::onVanillaVersionsReceived);
-    connect(
-        downloader,
-        &MinecraftDownloader::fabricVersionsReceived,
-        this,
-        &MainWindow::onFabricVersionsReceived);
 
-    connect(
-        downloader,
-        &MinecraftDownloader::forgeVersionsReceived,
-        this,
-        &MainWindow::onForgeVersionsReceived);
+    connect(downloader, &MinecraftDownloader::vanillaVersionsReceived,
+            this, &MainWindow::onVanillaVersionsReceived);
+    connect(downloader, &MinecraftDownloader::fabricVersionsReceived,
+            this, &MainWindow::onFabricVersionsReceived);
+    connect(downloader, &MinecraftDownloader::forgeVersionsReceived,
+            this, &MainWindow::onForgeVersionsReceived);
+    connect(downloader, &MinecraftDownloader::neoforgeVersionReceived,
+            this, &MainWindow::onNeoForgeVersionReceived);
 
-    connect(
-        downloader,
-        &MinecraftDownloader::neoforgeVersionReceived,
-        this,
-        &MainWindow::onNeoForgeVersionReceived);
-
-    connect(downloader,
-            &MinecraftDownloader::instanceCreated,
-            this,
-            [this](const QString& path)
-            {
-                QMessageBox::information(
-                    this,
-                    "Готово",
-                    "Игра установлена:\n" + path);
+    connect(downloader, &MinecraftDownloader::instanceCreated, this,
+            [this](const QString& path) {
+                QMessageBox::information(this, "Готово", "Игра установлена:\n" + path);
             });
 
-    connect(downloader,
-            &MinecraftDownloader::errorOccurred,
-            this,
-            [this](const QString& error)
-            {
-                QMessageBox::warning(
-                    this,
-                    "Ошибка",
-                    error);
+    connect(downloader, &MinecraftDownloader::errorOccurred, this,
+            [this](const QString& error) {
+                QMessageBox::warning(this, "Ошибка", error);
             });
 
-    connect(settingsWindow,
-            &SettingsWindow::settingsChanged,
-            this,
-            [this]()
-            {
-                if (LoaderBox->currentText() == "Vanilla")
-                {
-                    VersionBox->clear();
-                    VersionBox->addItem("Обновление списка...");
-                    downloader->fetchVanillaVersions();
-                }
-            });
+    // Подключение кнопок из .ui
+    connect(PlayButton, &QPushButton::clicked, this, &MainWindow::on_PlayButton_clicked);
+    connect(ModPlatformButton, &QPushButton::clicked, this, &MainWindow::on_ModPlatformButton_clicked);
+    connect(UpdateButton, &QPushButton::clicked, this, &MainWindow::on_UpdateButton_clicked);
+    connect(ElyByButton, &QPushButton::clicked, this, &MainWindow::on_ElyByButton_clicked);
+    connect(SettingsButton, &QPushButton::clicked, this, &MainWindow::on_SettingsButton_clicked);
+    connect(PickAccountButton, &QPushButton::clicked, this, &MainWindow::on_PickAccountButton_clicked);
+    connect(InstallerButton, &QPushButton::clicked, this, &MainWindow::on_InstallerButton_clicked);
 }
 
 void MainWindow::on_InstallerButton_clicked()
 {
-    QString version =
-        VersionBox->currentText();
+    QString versionText = VersionBox->currentText();
+    QString loader = LoaderBox->currentText().toLower();
 
-    QString loader =
-        LoaderBox->currentText().toLower();
+    QString cleanVersion = versionText;
+    if (cleanVersion.startsWith("Fabric ")) cleanVersion.remove("Fabric ");
+    if (cleanVersion.startsWith("Forge ")) cleanVersion.remove("Forge ");
+    if (cleanVersion.startsWith("NeoForge ")) cleanVersion.remove("NeoForge ");
 
-    // Fabric 1.21.1 -> 1.21.1
-    if(version.startsWith("Fabric "))
-    {
-        version.remove("Fabric ");
+    QString gameDir = settingsWindow->minecraftPath();
+    if (gameDir.isEmpty()) {
+        gameDir = QDir::homePath() + "/AppData/Roaming/.minecraft";
     }
 
-    // NeoForge 21.1.100 -> 21.1.100
-    if(version.startsWith("NeoForge "))
-    {
-        version.remove("NeoForge ");
-    }
+    QString instancePath = gameDir + "/versions/" + cleanVersion;
 
-    QString instancePath =
-        "C:/Users/matveak/Downloads/zxc";
+    downloader->createInstance(cleanVersion, loader == "vanilla" ? "" : loader, "", instancePath);
 
-    downloader->createInstance(
-        version,
-        loader == "vanilla"
-            ? ""
-            : loader,
-        "",
-        instancePath);
-
-    QMessageBox::information(
-        this,
-        "Установка",
-        "Начато скачивание " + version);
+    QMessageBox::information(this, "Установка", "Начато скачивание " + versionText);
 }
 
-void MainWindow::onLoaderChanged(const QString& loader)
+void MainWindow::on_ModPlatformButton_clicked()
 {
-    qDebug() << "Loader changed:" << loader;
-
-    VersionBox->clear();
-
-    if(loader == "Vanilla")
-        downloader->fetchVanillaVersions();
-    else if(loader == "Fabric")
-        downloader->fetchFabricVersions();
-    else if(loader == "Forge")
-        downloader->fetchForgeVersions();
-    else if(loader == "NeoForge")
-        downloader->fetchNeoForgeVersions();
+    ModWindow* window = new ModWindow(this);   // ← new + this
+    window->setSettingsWindow(settingsWindow);
+    window->setAttribute(Qt::WA_DeleteOnClose); // чтобы не открывалось дважды
+    window->exec();
 }
 
 void MainWindow::on_PlayButton_clicked()
 {
-    QString gameDir =
-        settingsWindow->minecraftPath();
+    QString gameDir = settingsWindow->minecraftPath();
+    if (gameDir.isEmpty()) {
+        gameDir = QDir::homePath() + "/AppData/Roaming/.minecraft";
+    }
 
-    if(gameDir.isEmpty())
-    {
-        QMessageBox::warning(
-            this,
-            "Ошибка",
-            "Не указана папка Minecraft");
+    QString versionText = VersionBox->currentText();
+    QString version = versionText;
 
+    if (version.startsWith("Fabric ")) version.remove("Fabric ");
+    if (version.startsWith("Forge ")) version.remove("Forge ");
+    if (version.startsWith("NeoForge ")) version.remove("NeoForge ");
+
+    QString versionDir = gameDir + "/versions/" + version;
+    QString jsonPath = versionDir + "/" + version + ".json";
+
+    if (!QFileInfo::exists(jsonPath)) {
+        QMessageBox::warning(this, "Ошибка", "Версия не установлена:\n" + jsonPath);
         return;
     }
 
-    QString version =
-        VersionBox->currentText();
-
-    if(version.startsWith("Fabric "))
-        version.remove("Fabric ");
-
-    if(version.startsWith("Forge "))
-        version.remove("Forge ");
-
-    if(version.startsWith("NeoForge "))
-        version.remove("NeoForge ");
-
-    QString versionDir =
-        gameDir +
-        "/versions/" +
-        version;
-
-    QString jsonPath =
-        versionDir +
-        "/" +
-        version +
-        ".json";
-
-    QString jarPath =
-        versionDir +
-        "/" +
-        version +
-        ".jar";
-
-    if(!QFileInfo::exists(jsonPath))
-    {
-        QMessageBox::warning(
-            this,
-            "Ошибка",
-            "Не найден файл версии:\n" +
-                jsonPath);
-
+    QFile file(jsonPath);
+    if (!file.open(QIODevice::ReadOnly)) {
+        QMessageBox::warning(this, "Ошибка", "Не удалось открыть version.json");
         return;
     }
 
-    QFile jsonFile(jsonPath);
+    QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+    file.close();
 
-    if(!jsonFile.open(QIODevice::ReadOnly))
-    {
-        QMessageBox::warning(
-            this,
-            "Ошибка",
-            "Не удалось открыть version json");
+    QJsonObject root = doc.object();
+    QString mainClass = root["mainClass"].toString();
 
+    if (mainClass.isEmpty()) {
+        QMessageBox::warning(this, "Ошибка", "mainClass не найден");
         return;
     }
 
-    QJsonDocument doc =
-        QJsonDocument::fromJson(
-            jsonFile.readAll());
-
-    jsonFile.close();
-
-    QJsonObject root =
-        doc.object();
-
-    QString mainClass =
-        root["mainClass"]
-            .toString();
-
-    if(mainClass.isEmpty())
-    {
-        QMessageBox::warning(
-            this,
-            "Ошибка",
-            "mainClass отсутствует");
-
-        return;
-    }
+    QString nativesPath = versionDir + "/natives";
 
 #ifdef Q_OS_WIN
     QString separator = ";";
@@ -266,104 +145,65 @@ void MainWindow::on_PlayButton_clicked()
 #endif
 
     QString classPath;
+    QJsonArray libraries = root["libraries"].toArray();
 
-    QJsonArray libraries =
-        root["libraries"]
-            .toArray();
+    for (const auto& value : libraries) {
+        QJsonObject lib = value.toObject();
+        QJsonObject downloads = lib["downloads"].toObject();
 
-    for(const auto& value : libraries)
-    {
-        QJsonObject lib =
-            value.toObject();
-
-        QJsonObject downloads =
-            lib["downloads"]
-                .toObject();
-
-        if(!downloads.contains("artifact"))
-            continue;
-
-        QJsonObject artifact =
-            downloads["artifact"]
-                .toObject();
-
-        QString path =
-            artifact["path"]
-                .toString();
-
-        if(path.isEmpty())
-            continue;
-
-        QString fullPath =
-            gameDir +
-            "/libraries/" +
-            path;
-
-        if(QFileInfo::exists(fullPath))
-        {
-            if(!classPath.isEmpty())
-                classPath += separator;
-
-            classPath += fullPath;
+        if (downloads.contains("artifact")) {
+            QJsonObject artifact = downloads["artifact"].toObject();
+            QString path = artifact["path"].toString();
+            if (!path.isEmpty()) {
+                QString fullPath = gameDir + "/libraries/" + path;
+                if (QFileInfo::exists(fullPath)) {
+                    if (!classPath.isEmpty()) classPath += separator;
+                    classPath += fullPath;
+                }
+            }
         }
     }
 
-    if(!classPath.isEmpty())
-        classPath += separator;
+    if (!classPath.isEmpty()) classPath += separator;
+    classPath += versionDir + "/" + version + ".jar";
 
-    classPath += jarPath;
+    // === Java Path (приоритет bundled Java) ===
+    QString javaPath = QDir::toNativeSeparators(
+        QCoreApplication::applicationDirPath() + "/java/bin/javaw.exe");
 
-    QString javaPath =
-        QDir::toNativeSeparators(
-            QCoreApplication::applicationDirPath() +
-            "/java/bin/javaw.exe");
-
-    if(!QFileInfo::exists(javaPath))
-        javaPath = "java";
-
-    QStringList args;
-
-    args
-        << "-Xms1G"
-        << "-Xmx2G"
-        << "-cp"
-        << classPath
-        << mainClass
-        << "--username" << "Player"
-        << "--version" << version
-        << "--gameDir" << gameDir
-        << "--assetsDir" << gameDir + "/assets"
-        << "--assetIndex"
-        << root["assets"].toString()
-        << "--accessToken" << "0"
-        << "--userType" << "legacy";
-
-    qDebug() << "JAVA:" << javaPath;
-    qDebug() << "MAIN:" << mainClass;
-    qDebug() << "CP:" << classPath;
-
-    bool ok =
-        QProcess::startDetached(
-            javaPath,
-            args,
-            gameDir);
-
-    if(!ok)
-    {
-        QMessageBox::critical(
-            this,
-            "Ошибка",
-            "Не удалось запустить Minecraft");
+    if (!QFileInfo::exists(javaPath)) {
+        javaPath = "javaw";  // системный
     }
-}
 
-void MainWindow::on_ModPlatformButton_clicked()
-{
-    qDebug() << "OPEN MODS";
+    QStringList args = {
+        "-Xms2G",
+        "-Xmx6G",
+        "-Djava.library.path=" + nativesPath,
+        "-Dorg.lwjgl.util.Debug=true",
+        "-cp", classPath,
+        mainClass,
+        "--username", "Player",
+        "--version", version,
+        "--gameDir", gameDir,
+        "--assetsDir", gameDir + "/assets",
+        "--assetIndex", root["assets"].toString(),
+        "--accessToken", "0",
+        "--userType", "legacy"
+    };
 
-    ModWindow window(this);
-    window.setSettingsWindow(settingsWindow);   // ← Важная строка!
-    window.exec();
+    qDebug() << "=== ЗАПУСК ===";
+    qDebug() << "Java:" << javaPath;
+    qDebug() << "Natives:" << nativesPath;
+    qDebug() << "Version:" << version;
+    qDebug() << "MainClass:" << mainClass;
+
+    bool success = QProcess::startDetached(javaPath, args, gameDir);
+
+    if (success) {
+        QMessageBox::information(this, "Запуск", "Minecraft запущен!");
+    } else {
+        QMessageBox::critical(this, "Ошибка", "Не удалось запустить процесс Java.");
+    }
 }
 
 void MainWindow::on_UpdateButton_clicked()
@@ -371,111 +211,46 @@ void MainWindow::on_UpdateButton_clicked()
     QMessageBox::information(this, "Обновление", "Проверка обновлений...");
 }
 
-void MainWindow::requestElyProfile()
-{
-    QNetworkRequest request(
-        QUrl("https://account.ely.by/api/account/v1/info"));
-
-    request.setRawHeader(
-        "Authorization",
-        "Bearer " +
-            elyAuth->token().toUtf8());
-
-    QNetworkReply* reply =
-        networkManager.get(request);
-
-    connect(
-        reply,
-        &QNetworkReply::finished,
-        this,
-        [this, reply]()
-        {
-            QByteArray data =
-                reply->readAll();
-
-            qDebug() << data;
-
-            QJsonDocument doc =
-                QJsonDocument::fromJson(data);
-
-            QString username =
-                doc.object()["username"]
-                    .toString();
-
-            QMessageBox::information(
-                this,
-                "Ely.by",
-                "Вход выполнен:\n" +
-                    username);
-
-            reply->deleteLater();
-        });
-}
-
 void MainWindow::on_ElyByButton_clicked()
 {
-    if (!elyAuth)
-    {
-        elyAuth =
-            new QOAuth2AuthorizationCodeFlow(this);
-
-        elyAuth->setAuthorizationUrl(
-            QUrl("https://account.ely.by/oauth2/v1"));
-
-        elyAuth->setAccessTokenUrl(
-            QUrl("https://account.ely.by/api/oauth2/v1/token"));
-
-        elyAuth->setClientIdentifier(
-            "yanoml1");
-
-        elyAuth->setClientIdentifierSharedKey(
-            "CXglpRel3S8wNFSqqJmoldvMw2JEjakYQMZ3-apRcEE0MurMW6x4fsLvUAvF9bU0");
-
-        auto* replyHandler =
-            new QOAuthHttpServerReplyHandler(
-                8080,
-                this);
-
-        elyAuth->setReplyHandler(
-            replyHandler);
-
-        connect(
-            elyAuth,
-            &QOAuth2AuthorizationCodeFlow::authorizeWithBrowser,
-            &QDesktopServices::openUrl);
-
-        connect(
-            elyAuth,
-            &QOAuth2AuthorizationCodeFlow::granted,
-            this,
-            [this]()
-            {
-                qDebug()
-                << "Авторизация успешна";
-
-                requestElyProfile();
-            });
+    // ... (твой текущий код Ely.by)
+    if (!elyAuth) {
+        // ... (оставь как было)
     }
-
     elyAuth->grant();
 }
 
-// void MainWindow::on_CreateModpackButton_clicked()
-// {
-//     CreateModpackWindow window(this);
-
-//     window.setDownloader(downloader);
-//     window.setSettingsWindow(settingsWindow);
-
-//     window.exec();
-// }
-
-void MainWindow::on_SettingsButton_clicked(){
+void MainWindow::on_SettingsButton_clicked()
+{
     settingsWindow->exec();
 }
 
-void MainWindow::on_PickAccountButton_clicked(){
+void MainWindow::on_PickAccountButton_clicked()
+{
     QMessageBox::information(this, "Аккаунт", "Выбор аккаунта...");
+}
+
+// ==================== Версии ====================
+
+void MainWindow::onLoaderChanged(const QString& loader)
+{
+    VersionBox->clear();
+
+    if (loader == "Vanilla")
+        downloader->fetchVanillaVersions();
+    else if (loader == "Fabric")
+        downloader->fetchFabricVersions();
+    else if (loader == "Forge")
+        downloader->fetchForgeVersions();
+    else if (loader == "NeoForge")
+        downloader->fetchNeoForgeVersions();
+}
+
+void MainWindow::onShowSnapshotsChanged(int state)
+{
+    VersionBox->clear();
+    VersionBox->addItem("Обновление списка...");
+    downloader->fetchVanillaVersions();
 }
 
 void MainWindow::onVanillaVersionsReceived(const QVector<MinecraftVersion>& versions)
@@ -483,266 +258,91 @@ void MainWindow::onVanillaVersionsReceived(const QVector<MinecraftVersion>& vers
     VersionBox->clear();
 
     QVector<MinecraftVersion> sorted = versions;
+    std::sort(sorted.begin(), sorted.end(), [](const MinecraftVersion& a, const MinecraftVersion& b) {
+        return QVersionNumber::fromString(a.gameVersion) > QVersionNumber::fromString(b.gameVersion);
+    });
 
-    std::sort(
-        sorted.begin(),
-        sorted.end(),
-        [](const MinecraftVersion& a,
-           const MinecraftVersion& b)
-        {
-            return QVersionNumber::fromString(a.gameVersion) >
-                   QVersionNumber::fromString(b.gameVersion);
-        });
+    bool showSnapshots = settingsWindow && settingsWindow->showSnapshots();
 
-    bool showSnapshots =
-        settingsWindow &&
-        settingsWindow->showSnapshots();
-
-    for(const auto& ver : sorted)
-    {
-        if(!showSnapshots &&
-            ver.loaderType != "release")
-        {
-            continue;
-        }
-
-        VersionBox->addItem(
-            ver.gameVersion,
-            ver.url);
+    for (const auto& ver : sorted) {
+        if (!showSnapshots && ver.loaderType != "release") continue;
+        VersionBox->addItem(ver.gameVersion);
     }
 }
 
 void MainWindow::onFabricVersionsReceived(const QJsonArray& versions)
 {
     VersionBox->clear();
-
-    QStringList mcVersions;
-
-    for(const auto& value : versions)
-    {
+    for (const auto& value : versions) {
         QJsonObject obj = value.toObject();
-
-        bool stable =
-            obj["stable"].toBool();
-
-        if(!settingsWindow->showSnapshots() &&
-            !stable)
-        {
-            continue;
-        }
-
-        QString version =
-            obj["version"].toString();
-
-        VersionBox->addItem(
-            "Fabric " + version);
+        if (!settingsWindow->showSnapshots() && !obj["stable"].toBool()) continue;
+        VersionBox->addItem("Fabric " + obj["version"].toString());
     }
-
-    std::sort(
-        mcVersions.begin(),
-        mcVersions.end(),
-        [](const QString& a,
-           const QString& b)
-        {
-            return QVersionNumber::fromString(a) >
-                   QVersionNumber::fromString(b);
-        });
-
-    for(const QString& version : mcVersions)
-    {
-        VersionBox->addItem(
-            "Fabric " + version);
-    }
-
-    qDebug() << "Fabric versions loaded:"
-             << VersionBox->count();
 }
 
 void MainWindow::onForgeVersionsReceived(const QJsonObject& json)
 {
     VersionBox->clear();
-
     QSet<QString> mcVersions;
+    QJsonObject promos = json["promos"].toObject();
 
-    QJsonObject promos =
-        json["promos"].toObject();
-
-    for(auto it = promos.begin();
-         it != promos.end();
-         ++it)
-    {
+    for (auto it = promos.begin(); it != promos.end(); ++it) {
         QString key = it.key();
-
-        // 1.21.1-latest -> 1.21.1
-        QString mcVersion =
-            key.section('-', 0, 0);
-
+        QString mcVersion = key.section('-', 0, 0);
         mcVersions.insert(mcVersion);
     }
 
-    QStringList versions =
-        mcVersions.values();
+    QStringList versions = mcVersions.values();
+    std::sort(versions.begin(), versions.end(), [](const QString& a, const QString& b) {
+        return QVersionNumber::fromString(a) > QVersionNumber::fromString(b);
+    });
 
-    std::sort(
-        versions.begin(),
-        versions.end(),
-        [](const QString& a,
-           const QString& b)
-        {
-            return QVersionNumber::fromString(a) >
-                   QVersionNumber::fromString(b);
-        });
-
-    for(const QString& version : versions)
-    {
-        VersionBox->addItem(
-            "Forge " + version);
-    }
+    for (const QString& v : versions)
+        VersionBox->addItem("Forge " + v);
 }
 
 void MainWindow::onNeoForgeVersionReceived(const QString& xml)
 {
     VersionBox->clear();
-
     QStringList lines = xml.split('\n');
+    QSet<QString> added;
 
-    QSet<QString> addedVersions;
-
-    for(const QString& line : lines)
-    {
-        if(!line.contains("<version>"))
-            continue;
-
+    for (const QString& line : lines) {
+        if (!line.contains("<version>")) continue;
         QString version = line;
-        version.remove("<version>");
-        version.remove("</version>");
-        version = version.trimmed();
+        version.remove("<version>").remove("</version>").trimmed();
 
-        // Пропускаем служебные версии
-        if(version.contains("beta", Qt::CaseInsensitive) ||
+        if (version.contains("beta", Qt::CaseInsensitive) ||
             version.contains("alpha", Qt::CaseInsensitive) ||
-            version.contains("rc", Qt::CaseInsensitive))
-        {
-            if(!settingsWindow->showSnapshots())
-                continue;
+            version.contains("rc", Qt::CaseInsensitive)) {
+            if (!settingsWindow->showSnapshots()) continue;
         }
 
-        QStringList parts = version.split('.');
-
-        if(parts.size() < 2)
-            continue;
-
-        bool okMajor = false;
-        bool okMinor = false;
-
-        int major = parts[0].toInt(&okMajor);
-        int minor = parts[1].toInt(&okMinor);
-
-        if(!okMajor || !okMinor)
-            continue;
-
-        QString mcVersion;
-
-        // NeoForge 21.1.x -> Minecraft 1.21.1
-        if(minor > 0)
-        {
-            mcVersion =
-                QString("1.%1.%2")
-                    .arg(major)
-                    .arg(minor);
+        // Простая обработка версии Minecraft
+        QString mcVersion = version;
+        if (mcVersion.startsWith("21.")) mcVersion = "1." + mcVersion;
+        if (!added.contains(mcVersion)) {
+            added.insert(mcVersion);
+            VersionBox->addItem(mcVersion);
         }
-        else
-        {
-            // NeoForge 21.0.x -> Minecraft 1.21
-            mcVersion =
-                QString("1.%1")
-                    .arg(major);
-        }
-
-        if(addedVersions.contains(mcVersion))
-            continue;
-
-        addedVersions.insert(mcVersion);
-
-        VersionBox->addItem(mcVersion);
     }
-
-    // Сортировка версий
-    QStringList versions;
-
-    for(int i = 0; i < VersionBox->count(); ++i)
-        versions << VersionBox->itemText(i);
-
-    std::sort(
-        versions.begin(),
-        versions.end(),
-        [](const QString& a, const QString& b)
-        {
-            return QVersionNumber::fromString(a) >
-                   QVersionNumber::fromString(b);
-        });
-
-    VersionBox->clear();
-
-    for(const QString& v : versions)
-        VersionBox->addItem(v);
-}
-
-void MainWindow::onShowSnapshotsChanged(int state)
-{
-    // Перезагружаем версии при изменении галочки
-    VersionBox->clear();
-    VersionBox->addItem("Обновление списка...");
-
-    downloader->fetchVanillaVersions();
 }
 
 void MainWindow::loadVersions()
 {
-    QPushButton* createModpackButton =
-        new QPushButton(
-            "Создать сборку",
-            centralwidget);
-
-    createModpackButton->setGeometry(
-        QRect(780, 680, 250, 30));
-
-    // connect(
-    //     createModpackButton,
-    //     &QPushButton::clicked,
-    //     this,
-    //     &MainWindow::on_CreateModpackButton_clicked);
-
-    if(!LoaderBox)
-    {
-
+    if (!LoaderBox) {
         LoaderBox = new QComboBox(centralwidget);
-
-        LoaderBox->setGeometry(
-            QRect(780, 640, 250, 30));
-
-        LoaderBox->addItem("Vanilla");
-        LoaderBox->addItem("Fabric");
-        LoaderBox->addItem("Forge");
-        LoaderBox->addItem("NeoForge");
-
-        connect(
-            LoaderBox,
-            &QComboBox::currentTextChanged,
-            this,
-            &MainWindow::onLoaderChanged);
+        LoaderBox->setGeometry(QRect(780, 640, 250, 30));
+        LoaderBox->addItems({"Vanilla", "Fabric", "Forge", "NeoForge"});
+        connect(LoaderBox, &QComboBox::currentTextChanged, this, &MainWindow::onLoaderChanged);
     }
 
-    if(!VersionBox)
-    {
+    if (!VersionBox) {
         VersionBox = new QComboBox(centralwidget);
-
-        VersionBox->setGeometry(
-            QRect(1050, 640, 250, 30));
+        VersionBox->setGeometry(QRect(1050, 640, 250, 30));
     }
 
     VersionBox->clear();
     VersionBox->addItem("Загрузка версий...");
-
     downloader->fetchVanillaVersions();
 }
