@@ -7,6 +7,7 @@
 #include <QProcess>
 #include <QFileInfo>
 #include <QCoreApplication>
+#include <QThread>
 
 // ==================== MainWindow ====================
 
@@ -58,13 +59,13 @@ void MainWindow::setupConnections()
             });
 
     // Подключение кнопок из .ui
-    connect(PlayButton, &QPushButton::clicked, this, &MainWindow::on_PlayButton_clicked);
-    connect(ModPlatformButton, &QPushButton::clicked, this, &MainWindow::on_ModPlatformButton_clicked);
-    connect(UpdateButton, &QPushButton::clicked, this, &MainWindow::on_UpdateButton_clicked);
-    connect(ElyByButton, &QPushButton::clicked, this, &MainWindow::on_ElyByButton_clicked);
-    connect(SettingsButton, &QPushButton::clicked, this, &MainWindow::on_SettingsButton_clicked);
-    connect(PickAccountButton, &QPushButton::clicked, this, &MainWindow::on_PickAccountButton_clicked);
-    connect(InstallerButton, &QPushButton::clicked, this, &MainWindow::on_InstallerButton_clicked);
+    //connect(PlayButton, &QPushButton::clicked, this, &MainWindow::on_PlayButton_clicked);
+    //connect(ModPlatformButton, &QPushButton::clicked, this, &MainWindow::on_ModPlatformButton_clicked);
+    //connect(UpdateButton, &QPushButton::clicked, this, &MainWindow::on_UpdateButton_clicked);
+    //connect(ElyByButton, &QPushButton::clicked, this, &MainWindow::on_ElyByButton_clicked);
+    //connect(SettingsButton, &QPushButton::clicked, this, &MainWindow::on_SettingsButton_clicked);
+    //connect(PickAccountButton, &QPushButton::clicked, this, &MainWindow::on_PickAccountButton_clicked);
+    //connect(InstallerButton, &QPushButton::clicked, this, &MainWindow::on_InstallerButton_clicked);
 }
 
 void MainWindow::on_InstallerButton_clicked()
@@ -168,8 +169,7 @@ void MainWindow::on_PlayButton_clicked()
     classPath += versionDir + "/" + version + ".jar";
 
     // === Java Path (приоритет bundled Java) ===
-    QString javaPath = QDir::toNativeSeparators(
-        QCoreApplication::applicationDirPath() + "/java/bin/javaw.exe");
+    QString javaPath = QDir::toNativeSeparators(QCoreApplication::applicationDirPath() + "/java/bin/javaw.exe");
 
     if (!QFileInfo::exists(javaPath)) {
         javaPath = "javaw";  // системный
@@ -197,13 +197,31 @@ void MainWindow::on_PlayButton_clicked()
     qDebug() << "Version:" << version;
     qDebug() << "MainClass:" << mainClass;
 
-    bool success = QProcess::startDetached(javaPath, args, gameDir);
+    QThread* thread = new QThread;
+    connect(thread, &QThread::finished, thread, &QThread::deleteLater);
 
-    if (success) {
-        QMessageBox::information(this, "Запуск", "Minecraft запущен!");
-    } else {
-        QMessageBox::critical(this, "Ошибка", "Не удалось запустить процесс Java.");
-    }
+    connect(thread, &QThread::started, [args, javaPath] {
+        QProcess* process = new QProcess(nullptr);
+        connect(process, &QProcess::readyReadStandardOutput, [process] {
+            qDebug().noquote() << process->readAllStandardOutput();
+        });
+
+        connect(process, &QProcess::readyReadStandardError, [process] {
+            qCritical().noquote() << process->readAllStandardError();
+        });
+
+        process->start(javaPath, args);
+        if (!process->waitForStarted()) {
+            qCritical() << "Failed to start Java:" << process->errorString();
+            return;
+        }
+
+        process->waitForFinished(-1);
+
+        qDebug() << "Java exited with code" << process->exitCode();
+    });
+
+    thread->start();
 }
 
 void MainWindow::on_UpdateButton_clicked()
@@ -214,10 +232,10 @@ void MainWindow::on_UpdateButton_clicked()
 void MainWindow::on_ElyByButton_clicked()
 {
     // ... (твой текущий код Ely.by)
-    if (!elyAuth) {
+    //if (!elyAuth) {
         // ... (оставь как было)
-    }
-    elyAuth->grant();
+    //}
+    //elyAuth->grant();
 }
 
 void MainWindow::on_SettingsButton_clicked()

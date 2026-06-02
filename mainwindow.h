@@ -7,8 +7,8 @@
 #include <QMainWindow>
 #include "moddetailwindow.h"
 #include "settingswindow.h"
-#include <QOAuth2AuthorizationCodeFlow>
-#include <QOAuthHttpServerReplyHandler>
+//#include <QOAuth2AuthorizationCodeFlow>
+//#include <QOAuthHttpServerReplyHandler>
 #include <QNetworkAccessManager>
 #include <QDesktopServices>
 #include <QUrl>
@@ -43,7 +43,7 @@ private:
     QProgressBar* globalProgressBar = nullptr;
     QProgressBar* progressBar = nullptr;
     QNetworkAccessManager networkManager;
-    QOAuth2AuthorizationCodeFlow* elyAuth = nullptr;
+    //QOAuth2AuthorizationCodeFlow* elyAuth = nullptr;
     SettingsWindow* settingsWindow = nullptr;
     QComboBox* LoaderBox = nullptr;
 
