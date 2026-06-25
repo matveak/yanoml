@@ -130,99 +130,81 @@ void ModrithAPI::getMods(QString query,
             });
 }
 
-// ===================== FETCH VERSIONS (WITH PAGINATION) =====================
+// ===================== FETCH VERSIONS (FROM TAG ENDPOINT) =====================
 void ModrithAPI::fetchAvailableVersions(const QString& loader)
 {
     if (loader.isEmpty()) return;
 
-    // Инициируем сбор всех версий с пагинацией
-    fetchAvailableVersionsPage(loader, 0, new QSet<QString>());
-}
-
-void ModrithAPI::fetchAvailableVersionsPage(const QString& loader, int offset, QSet<QString>* versionsSet)
-{
-    QUrl url(apiUrl + "/search");
-    QUrlQuery q;
-
-    q.addQueryItem("query", "minecraft");
-    q.addQueryItem("index", "downloads");
-    q.addQueryItem("limit", "100");  // МАКСИМАЛЬНЫЙ ЛИМИТ Modrinth API
-    q.addQueryItem("offset", QString::number(offset));
-    q.addQueryItem("facets", QString("[\"categories:%1\"]").arg(loader));
-
-    url.setQuery(q);
+    // Используем endpoint для получения всех версий Minecraft
+    QUrl url(apiUrl + "/tag/game_version");
 
     QNetworkRequest req(url);
     req.setRawHeader("User-Agent", "MinecraftLauncher/1.0 (Qt)");
 
     QNetworkReply* reply = manager.get(req);
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply, loader, offset, versionsSet]()
+    connect(reply, &QNetworkReply::finished, this, [this, reply, loader]()
             {
                 reply->deleteLater();
 
-                QJsonArray hits;
-                int totalHits = 0;
+                QSet<QString> versionsSet;
 
-                // Пытаемся получить версии из API
                 if (reply->error() == QNetworkReply::NoError)
                 {
                     QJsonParseError err;
                     QJsonDocument doc = QJsonDocument::fromJson(reply->readAll(), &err);
-                    if (err.error == QJsonParseError::NoError)
+                    
+                    if (err.error == QJsonParseError::NoError && doc.isArray())
                     {
-                        hits = doc.object()["hits"].toArray();
-                        totalHits = doc.object()["total_hits"].toInt(0);
-                        
-                        qDebug() << "Страница" << (offset / 100 + 1) << "| Получено модов:" << hits.size() << "| Всего:" << totalHits;
+                        QJsonArray versions = doc.array();
+                        qDebug() << "Получено версий с API:" << versions.size();
 
-                        for (const auto& hit : hits)
+                        // Собираем только релизные версии
+                        for (const auto& versionObj : versions)
                         {
-                            QJsonArray gameVersions = hit.toObject()["versions"].toArray();
-                            for (const auto& v : gameVersions)
+                            QJsonObject obj = versionObj.toObject();
+                            QString type = obj["type"].toString();
+                            QString version = obj["version"].toString();
+
+                            // Берём только release версии (опционально можно добавить snapshots)
+                            if (type == "release" && !version.isEmpty())
                             {
-                                QString ver = v.toString().trimmed();
-                                if (!ver.isEmpty() && ver.contains('.'))
-                                    versionsSet->insert(ver);
+                                versionsSet.insert(version);
+                                qDebug() << "Добавлена версия:" << version;
                             }
                         }
+                        
+                        qDebug() << "Найдено уникальных версий:" << versionsSet.size();
                     }
                 }
-
-                // === Если есть ещё результаты, загружаем следующую страницу ===
-                if (hits.size() == 100 && offset + 100 < totalHits)
+                else
                 {
-                    qDebug() << "Загружаем следующую страницу...";
-                    fetchAvailableVersionsPage(loader, offset + 100, versionsSet);
-                    return;
+                    qDebug() << "Ошибка при загрузке версий:" << reply->errorString();
                 }
 
-                // === ВСЕ СТРАНИЦЫ ЗАГРУЖЕНЫ ===
-                qDebug() << "Загрузка завершена! Найдено уникальных версий:" << versionsSet->size();
-
-                // ==================== Fallback — если почти ничего не найдено ====================
-                if (versionsSet->size() < 5)
+                // === Если почти ничего не найдено, используем fallback ===
+                if (versionsSet.size() < 5)
                 {
                     qDebug() << "Используется fallback список версий";
                     
                     if (loader == "forge")
                     {
-                        *versionsSet << "1.21.1" << "1.21" << "1.20.1" << "1.20.2" << "1.20"
+                        versionsSet << "1.21.1" << "1.21" << "1.20.1" << "1.20.2" << "1.20"
                                     << "1.19.2" << "1.19.4" << "1.18.2" << "1.18.1" << "1.17.1"
                                     << "1.16.5" << "1.16.4" << "1.15.2" << "1.14.4" << "1.12.2";
                     }
                     else if (loader == "neoforge")
                     {
-                        *versionsSet << "1.21.1" << "1.21" << "1.20.1" << "1.20.2" << "1.20";
+                        versionsSet << "1.21.1" << "1.21" << "1.20.1" << "1.20.2" << "1.20";
                     }
                     else if (loader == "fabric" || loader == "quilt")
                     {
-                        *versionsSet << "1.21.1" << "1.21" << "1.20.1" << "1.20.2" << "1.19.2"
+                        versionsSet << "1.21.1" << "1.21" << "1.20.1" << "1.20.2" << "1.19.2"
                                     << "1.18.2" << "1.17.1" << "1.16.5";
                     }
                 }
 
-                QStringList versions = versionsSet->values();
+                QStringList versions = versionsSet.values();
                 std::sort(versions.begin(), versions.end(), [](const QString& a, const QString& b) {
                     return QVersionNumber::fromString(a) > QVersionNumber::fromString(b);
                 });
@@ -231,9 +213,6 @@ void ModrithAPI::fetchAvailableVersionsPage(const QString& loader, int offset, Q
                 qDebug() << "Версии:" << versions;
 
                 emit AvailableVersions(loader, versions);
-                
-                // Очистка памяти
-                delete versionsSet;
             });
 }
 
