@@ -140,7 +140,7 @@ void ModrithAPI::fetchAvailableVersions(const QString& loader)
 
     q.addQueryItem("query", "minecraft");
     q.addQueryItem("index", "downloads");
-    q.addQueryItem("limit", "200");
+    q.addQueryItem("limit", "500");  // УВЕЛИЧЕНО с 200 на 500
     q.addQueryItem("facets", QString("[\"categories:%1\"]").arg(loader));
 
     url.setQuery(q);
@@ -164,6 +164,8 @@ void ModrithAPI::fetchAvailableVersions(const QString& loader)
                     if (err.error == QJsonParseError::NoError)
                     {
                         QJsonArray hits = doc.object()["hits"].toArray();
+                        qDebug() << "Получено модов из API:" << hits.size();
+                        
                         for (const auto& hit : hits)
                         {
                             QJsonArray gameVersions = hit.toObject()["versions"].toArray();
@@ -174,12 +176,17 @@ void ModrithAPI::fetchAvailableVersions(const QString& loader)
                                     versionsSet.insert(ver);
                             }
                         }
+                        
+                        qDebug() << "Найдено уникальных версий:" << versionsSet.size();
+                        qDebug() << "Версии:" << versionsSet.values();
                     }
                 }
 
                 // ==================== Fallback — расширенный список ====================
                 if (versionsSet.size() < 12)
                 {
+                    qDebug() << "Используется fallback список версий";
+                    
                     if (loader == "forge")
                     {
                         versionsSet << "1.21.1" << "1.21" << "1.20.1" << "1.20.2" << "1.20"
@@ -202,6 +209,7 @@ void ModrithAPI::fetchAvailableVersions(const QString& loader)
                     return QVersionNumber::fromString(a) > QVersionNumber::fromString(b);
                 });
 
+                qDebug() << "Итого версий для отправки:" << versions.size();
                 emit AvailableVersions(loader, versions);
             });
 }
