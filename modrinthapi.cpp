@@ -3,6 +3,7 @@
 #include <QDebug>
 #include <QSet>
 #include <algorithm>
+#include <QRegularExpression>
 
 QString Order2String(SortOrder order)
 {
@@ -159,33 +160,31 @@ void ModrithAPI::fetchAvailableVersions(const QString& loader)
                         QJsonArray versions = doc.array();
                         qDebug() << "Получено версий с API:" << versions.size();
                         
-                        // ОТЛАДКА: показываем первый элемент
-                        if (!versions.isEmpty())
-                        {
-                            qDebug() << "Первая версия (JSON):" << QJsonDocument(versions[0].toObject()).toJson();
-                        }
+                        // Регулярное выражение для Minecraft версий (1.XX, 1.XX.X и т.д.)
+                        QRegularExpression mcVersionRegex("^1\\.(\\d+)(\\.(\\d+))?$");
+                        
+                        int validVersions = 0;
 
-                        // Собираем только релизные версии
+                        // Собираем только версии Minecraft (формата 1.XX.X)
                         for (int i = 0; i < versions.size(); ++i)
                         {
                             QJsonObject obj = versions[i].toObject();
-                            QString type = obj["type"].toString();
                             QString version = obj["version"].toString();
 
-                            // DEBUG: первые 5 версий
-                            if (i < 5)
-                            {
-                                qDebug() << "Версия" << i << "| type:" << type << "| version:" << version;
-                            }
-
-                            // Берём только release версии (опционально можно добавить snapshots)
-                            if ((type == "release" || type == "snapshot") && !version.isEmpty())
+                            // Проверяем, что это версия Minecraft (начинается с "1.")
+                            if (mcVersionRegex.match(version).hasMatch())
                             {
                                 versionsSet.insert(version);
+                                validVersions++;
+                                
+                                if (validVersions <= 10)
+                                {
+                                    qDebug() << "Добавлена Minecraft версия:" << version;
+                                }
                             }
                         }
                         
-                        qDebug() << "Найдено уникальных версий:" << versionsSet.size();
+                        qDebug() << "Найдено уникальных Minecraft версий:" << versionsSet.size();
                     }
                 }
                 else
