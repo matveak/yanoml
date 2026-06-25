@@ -1,41 +1,25 @@
 #include "modrinthapi.h"
-
 #include <QJsonParseError>
-#include <QJsonDocument>
-#include <QJsonArray>
-#include <QJsonObject>
 #include <QDebug>
+#include <QSet>
 #include <algorithm>
-
-ModrithAPI::ModrithAPI(QObject* parent)
-    : QObject(parent)
-{
-}
 
 QString Order2String(SortOrder order)
 {
     switch(order)
     {
-    case SortOrder::relevance:
-        return "relevance";
-
-    case SortOrder::downloads:
-        return "downloads";
-
-    case SortOrder::follows:
-        return "follows";
-
-    case SortOrder::newest:
-        return "newest";
-
-    case SortOrder::updated:
-        return "updated";
+    case SortOrder::relevance: return "relevance";
+    case SortOrder::downloads: return "downloads";
+    case SortOrder::follows:   return "follows";
+    case SortOrder::newest:    return "newest";
+    case SortOrder::updated:   return "updated";
     }
-
-    Q_UNREACHABLE();
     return "relevance";
 }
 
+ModrithAPI::ModrithAPI(QObject* parent) : QObject(parent) {}
+
+// ===================== GET MODS =====================
 void ModrithAPI::getMods(QString query,
                          QString mcVersion,
                          QString loader,
@@ -44,461 +28,356 @@ void ModrithAPI::getMods(QString query,
                          int count)
 {
     QUrl url(apiUrl + "/search");
-
     QUrlQuery q;
 
-    q.addQueryItem(
-        "query",
-        query);
-
-    q.addQueryItem(
-        "index",
-        Order2String(order));
-
-    q.addQueryItem(
-        "offset",
-        QString::number(first));
-
-    q.addQueryItem(
-        "limit",
-        QString::number(count));
-
-    // =====================
-    // Фильтры Modrinth
-    // =====================
+    q.addQueryItem("query", query.isEmpty() ? "minecraft" : query);
+    q.addQueryItem("index", Order2String(order));
+    q.addQueryItem("offset", QString::number(first));
+    q.addQueryItem("limit", QString::number(count));
 
     QJsonArray facets;
-    QJsonArray group;
 
-    if(!mcVersion.isEmpty())
+    // Строгие фильтры
+    if (!mcVersion.isEmpty() && mcVersion != "Любая версия")
     {
-        group.append(
-            QString("versions:%1")
-                .arg(mcVersion));
+        QJsonArray versionGroup;
+        versionGroup.append(QString("versions:%1").arg(mcVersion));
+        facets.append(versionGroup);
     }
 
-    if(!loader.isEmpty())
+    if (!loader.isEmpty() && loader != "Любой загрузчик")
     {
-        group.append(
-            QString("categories:%1")
-                .arg(loader));
+        QJsonArray loaderGroup;
+        loaderGroup.append(QString("categories:%1").arg(loader));
+        facets.append(loaderGroup);
     }
 
-    if(!group.isEmpty())
+    if (!facets.isEmpty())
     {
-        facets.append(group);
-
-        q.addQueryItem(
-            "facets",
-            QString::fromUtf8(
-                QJsonDocument(facets)
-                    .toJson(QJsonDocument::Compact)));
+        q.addQueryItem("facets", QString::fromUtf8(
+                                     QJsonDocument(facets).toJson(QJsonDocument::Compact)));
     }
 
     url.setQuery(q);
 
     QNetworkRequest req(url);
+    req.setRawHeader("User-Agent", "MinecraftLauncher/1.0 (Qt)");
 
-    req.setHeader(
-        QNetworkRequest::ContentTypeHeader,
-        "application/json");
+    QNetworkReply* reply = manager.get(req);
 
-    req.setRawHeader(
-        "User-Agent",
-        "MinecraftLauncher/1.0 (Qt)");
-
-    QNetworkReply* reply =
-        manager.get(req);
-
-    connect(
-        reply,
-        &QNetworkReply::finished,
-        this,
-        [this, reply]()
-        {
-            reply->deleteLater();
-
-            if(reply->error() !=
-                QNetworkReply::NoError)
-            {
-                emit OnError(
-                    reply->errorString());
-
-                return;
-            }
-
-            QJsonParseError parseError;
-
-            QJsonDocument doc =
-                QJsonDocument::fromJson(
-                    reply->readAll(),
-                    &parseError);
-
-            if(parseError.error !=
-                QJsonParseError::NoError)
-            {
-                emit OnError(
-                    parseError.errorString());
-
-                return;
-            }
-
-            QJsonObject json =
-                doc.object();
-
-            if(!json.contains("hits"))
-            {
-                emit OnError(
-                    "Invalid response");
-
-                return;
-            }
-
-            QVector<Mod> mods;
-
-            QJsonArray hits =
-                json["hits"].toArray();
-
-            for(const auto& hit : hits)
-            {
-                QJsonObject obj =
-                    hit.toObject();
-
-                Mod mod;
-
-                mod.id =
-                    obj["slug"]
-                        .toString();
-
-                mod.name =
-                    obj["title"]
-                        .toString();
-
-                mod.description =
-                    obj["description"]
-                        .toString();
-
-                mod.downloads =
-                    static_cast<size_t>(
-                        obj["downloads"]
-                            .toDouble());
-
-                mod.iconURL =
-                    QUrl(
-                        obj["icon_url"]
-                            .toString());
-
-                mod.author =
-                    obj["author"]
-                        .toString();
-
-                mod.dateCreated =
-                    obj["date_created"]
-                        .toString();
-
-                mod.dateUpdated =
-                    obj["date_modified"]
-                        .toString();
-
-                mod.color =
-                    static_cast<QRgb>(
-                        obj["color"]
-                            .toDouble());
-
-                QJsonArray categories =
-                    obj["categories"]
-                        .toArray();
-
-                for(const auto& c :
-                     categories)
-                {
-                    mod.categories
-                        .push_back(
-                            c.toString());
-                }
-
-                QJsonArray versions =
-                    obj["versions"]
-                        .toArray();
-
-                for(const auto& v :
-                     versions)
-                {
-                    mod.versions
-                        .push_back(
-                            v.toString());
-                }
-
-                mods.push_back(mod);
-            }
-
-            std::sort(
-                mods.begin(),
-                mods.end(),
-                [](const Mod& a,
-                   const Mod& b)
-                {
-                    return a.downloads >
-                           b.downloads;
-                });
-
-            emit ModList(mods);
-        });
-}
-
-void ModrithAPI::getDownloadLinks(
-    QString slug,
-    QString minecraftVersion,
-    QString loader)
-{
-    QUrl url(
-        apiUrl +
-        "/project/" +
-        slug +
-        "/version");
-
-    QNetworkRequest req(url);
-
-    req.setRawHeader(
-        "User-Agent",
-        "MinecraftLauncher/1.0 (Qt)");
-
-    QNetworkReply* reply =
-        manager.get(req);
-
-    connect(
-        reply,
-        &QNetworkReply::finished,
-        this,
-        [this,
-         reply,
-         minecraftVersion,
-         loader]()
-        {
-            reply->deleteLater();
-
-            if(reply->error() !=
-                QNetworkReply::NoError)
-            {
-                emit OnError(
-                    reply->errorString());
-
-                return;
-            }
-
-            QJsonParseError err;
-
-            QJsonDocument doc =
-                QJsonDocument::fromJson(
-                    reply->readAll(),
-                    &err);
-
-            if(err.error !=
-                QJsonParseError::NoError)
-            {
-                emit OnError(
-                    err.errorString());
-
-                return;
-            }
-
-            if(!doc.isArray())
-            {
-                emit OnError(
-                    "Invalid response");
-
-                return;
-            }
-
-            QVector<QUrl> links;
-
-            QJsonArray versions =
-                doc.array();
-
-            for(const auto& v :
-                 versions)
-            {
-                QJsonObject version =
-                    v.toObject();
-
-                bool versionMatched =
-                    false;
-
-                QJsonArray gameVersions =
-                    version["game_versions"]
-                        .toArray();
-
-                for(const auto& gv :
-                     gameVersions)
-                {
-                    if(gv.toString() ==
-                        minecraftVersion)
-                    {
-                        versionMatched =
-                            true;
-                        break;
-                    }
-                }
-
-                if(!versionMatched)
-                    continue;
-
-                if(!loader.isEmpty())
-                {
-                    bool loaderMatched =
-                        false;
-
-                    QJsonArray loaders =
-                        version["loaders"]
-                            .toArray();
-
-                    for(const auto& l :
-                         loaders)
-                    {
-                        if(l.toString() ==
-                            loader)
-                        {
-                            loaderMatched =
-                                true;
-                            break;
-                        }
-                    }
-
-                    if(!loaderMatched)
-                        continue;
-                }
-
-                QJsonArray files =
-                    version["files"]
-                        .toArray();
-
-                for(const auto& f :
-                     files)
-                {
-                    QJsonObject file =
-                        f.toObject();
-
-                    if(file["primary"]
-                            .toBool())
-                    {
-                        QString fileUrl =
-                            file["url"]
-                                .toString();
-
-                        if(!fileUrl.isEmpty())
-                        {
-                            links.push_back(
-                                QUrl(fileUrl));
-                        }
-
-                        break;
-                    }
-                }
-            }
-
-            if(links.isEmpty())
-            {
-                emit OnError(
-                    "No matching versions found");
-
-                return;
-            }
-
-            emit DownloadLinks(links);
-        });
-}
-
-void ModrithAPI::getProject(QString slug)
-{
-    QUrl url(
-        apiUrl +
-        "/project/" +
-        slug);
-
-    QNetworkReply* reply =
-        manager.get(
-            QNetworkRequest(url));
-
-    connect(reply,
-            &QNetworkReply::finished,
-            this,
-            [this, reply]()
+    connect(reply, &QNetworkReply::finished, this, [this, reply, mcVersion, loader]()
             {
                 reply->deleteLater();
 
-                if(reply->error() !=
-                    QNetworkReply::NoError)
+                if (reply->error() != QNetworkReply::NoError)
                 {
-                    emit OnError(
-                        reply->errorString());
-
+                    emit OnError(reply->errorString());
                     return;
                 }
 
-                QJsonDocument doc =
-                    QJsonDocument::fromJson(
-                        reply->readAll());
+                QJsonParseError parseError;
+                QJsonDocument doc = QJsonDocument::fromJson(reply->readAll(), &parseError);
 
-                if(!doc.isObject())
+                if (parseError.error != QJsonParseError::NoError)
                 {
-                    emit OnError(
-                        "Invalid JSON");
-
+                    emit OnError(parseError.errorString());
                     return;
                 }
 
-                QJsonObject obj =
-                    doc.object();
+                QVector<Mod> mods;
+                QJsonArray hits = doc.object()["hits"].toArray();
 
+                for (const auto& hit : hits)
+                {
+                    QJsonObject obj = hit.toObject();
+                    Mod mod;
+
+                    mod.id          = obj["slug"].toString();
+                    mod.name        = obj["title"].toString();
+                    mod.description = obj["description"].toString();
+                    mod.downloads   = static_cast<size_t>(obj["downloads"].toDouble());
+                    mod.iconURL     = QUrl(obj["icon_url"].toString());
+                    mod.author      = obj["author"].toString();
+                    mod.color       = static_cast<QRgb>(obj["color"].toDouble());
+
+                    QJsonArray cats = obj["categories"].toArray();
+                    for (const auto& c : cats)
+                        mod.categories.push_back(c.toString());
+
+                    QJsonArray vers = obj["versions"].toArray();
+                    for (const auto& v : vers)
+                        mod.versions.push_back(v.toString());
+
+                    // Дополнительная клиентская проверка
+                    bool versionOk = mcVersion.isEmpty() || mcVersion == "Любая версия";
+                    if (!versionOk)
+                    {
+                        for (const QString& v : mod.versions)
+                        {
+                            if (v == mcVersion)
+                            {
+                                versionOk = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (versionOk)
+                        mods.push_back(mod);
+                }
+
+                emit ModList(mods);
+            });
+}
+
+// ===================== FETCH VERSIONS =====================
+void ModrithAPI::fetchAvailableVersions(const QString& loader)
+{
+    if (loader.isEmpty()) return;
+
+    QUrl url(apiUrl + "/search");
+    QUrlQuery q;
+
+    q.addQueryItem("query", "minecraft");
+    q.addQueryItem("index", "downloads");
+    q.addQueryItem("limit", "200");
+    q.addQueryItem("facets", QString("[\"categories:%1\"]").arg(loader));
+
+    url.setQuery(q);
+
+    QNetworkRequest req(url);
+    req.setRawHeader("User-Agent", "MinecraftLauncher/1.0 (Qt)");
+
+    QNetworkReply* reply = manager.get(req);
+
+    connect(reply, &QNetworkReply::finished, this, [this, reply, loader]()
+            {
+                reply->deleteLater();
+
+                QSet<QString> versionsSet;
+
+                // Пытаемся получить версии из API
+                if (reply->error() == QNetworkReply::NoError)
+                {
+                    QJsonParseError err;
+                    QJsonDocument doc = QJsonDocument::fromJson(reply->readAll(), &err);
+                    if (err.error == QJsonParseError::NoError)
+                    {
+                        QJsonArray hits = doc.object()["hits"].toArray();
+                        for (const auto& hit : hits)
+                        {
+                            QJsonArray gameVersions = hit.toObject()["versions"].toArray();
+                            for (const auto& v : gameVersions)
+                            {
+                                QString ver = v.toString().trimmed();
+                                if (!ver.isEmpty() && ver.contains('.'))
+                                    versionsSet.insert(ver);
+                            }
+                        }
+                    }
+                }
+
+                // ==================== Fallback — расширенный список ====================
+                if (versionsSet.size() < 12)
+                {
+                    if (loader == "forge")
+                    {
+                        versionsSet << "1.21.1" << "1.21" << "1.20.1" << "1.20.2" << "1.20"
+                                    << "1.19.2" << "1.19.4" << "1.18.2" << "1.18.1" << "1.17.1"
+                                    << "1.16.5" << "1.16.4" << "1.15.2" << "1.14.4" << "1.12.2";
+                    }
+                    else if (loader == "neoforge")
+                    {
+                        versionsSet << "1.21.1" << "1.21" << "1.20.1" << "1.20.2" << "1.20";
+                    }
+                    else if (loader == "fabric" || loader == "quilt")
+                    {
+                        versionsSet << "1.21.1" << "1.21" << "1.20.1" << "1.20.2" << "1.19.2"
+                                    << "1.18.2" << "1.17.1" << "1.16.5";
+                    }
+                }
+
+                QStringList versions = versionsSet.values();
+                std::sort(versions.begin(), versions.end(), [](const QString& a, const QString& b) {
+                    return QVersionNumber::fromString(a) > QVersionNumber::fromString(b);
+                });
+
+                emit AvailableVersions(loader, versions);
+            });
+}
+
+// Вспомогательная функция с fallback'ом
+void ModrithAPI::useFallbackVersions(const QString& loader)
+{
+    QStringList versions;
+
+    if (loader == "neoforge")
+    {
+        versions << "1.21.1" << "1.21" << "1.20.1";
+    }
+    else if (loader == "forge")
+    {
+        versions << "1.21.1" << "1.20.1" << "1.20" << "1.19.2" << "1.18.2";
+    }
+    else if (loader == "fabric" || loader == "quilt")
+    {
+        versions << "1.21.1" << "1.21" << "1.20.1" << "1.20" << "1.19.2" << "1.18.2";
+    }
+
+    emit AvailableVersions(loader, versions);
+}
+
+// ===================== DOWNLOAD LINKS =====================
+void ModrithAPI::getDownloadLinks(QString slug,
+                                  QString minecraftVersion,
+                                  QString loader)
+{
+    QUrl url(apiUrl + "/project/" + slug + "/version");
+
+    QNetworkRequest req(url);
+    req.setRawHeader("User-Agent", "MinecraftLauncher/1.0 (Qt)");
+
+    QNetworkReply* reply = manager.get(req);
+
+    connect(reply, &QNetworkReply::finished, this,
+            [this, reply, minecraftVersion, loader]()
+            {
+                reply->deleteLater();
+
+                if (reply->error() != QNetworkReply::NoError)
+                {
+                    emit OnError(reply->errorString());
+                    return;
+                }
+
+                QJsonParseError err;
+                QJsonDocument doc = QJsonDocument::fromJson(reply->readAll(), &err);
+
+                if (err.error != QJsonParseError::NoError || !doc.isArray())
+                {
+                    emit OnError("Invalid response from Modrinth");
+                    return;
+                }
+
+                QVector<QUrl> links;
+                QJsonArray versionsArray = doc.array();
+
+                bool anyVersion = minecraftVersion.isEmpty() || minecraftVersion == "Любая версия";
+
+                for (const auto& v : versionsArray)
+                {
+                    QJsonObject versionObj = v.toObject();
+
+                    // === Проверка версии Minecraft ===
+                    bool versionMatched = anyVersion;
+                    if (!anyVersion)
+                    {
+                        QJsonArray gameVersions = versionObj["game_versions"].toArray();
+                        for (const auto& gv : gameVersions)
+                        {
+                            if (gv.toString() == minecraftVersion)
+                            {
+                                versionMatched = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (!versionMatched) continue;
+
+                    // === Проверка загрузчика ===
+                    if (!loader.isEmpty())
+                    {
+                        bool loaderMatched = false;
+                        QJsonArray loaders = versionObj["loaders"].toArray();
+                        for (const auto& l : loaders)
+                        {
+                            if (l.toString().toLower() == loader.toLower())
+                            {
+                                loaderMatched = true;
+                                break;
+                            }
+                        }
+                        if (!loaderMatched) continue;
+                    }
+
+                    // === Берём primary файл ===
+                    QJsonArray files = versionObj["files"].toArray();
+                    for (const auto& f : files)
+                    {
+                        QJsonObject fileObj = f.toObject();
+                        if (fileObj["primary"].toBool())
+                        {
+                            QString fileUrl = fileObj["url"].toString();
+                            if (!fileUrl.isEmpty())
+                            {
+                                links.push_back(QUrl(fileUrl));
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!links.isEmpty())
+                        break; // нашли подходящий — выходим
+                }
+
+                if (links.isEmpty())
+                {
+                    emit OnError("No matching versions found for " + minecraftVersion +
+                                 " + " + loader + "\n\n"
+                                                  "Мод может не поддерживать эту версию.");
+                    return;
+                }
+
+                emit DownloadLinks(links);
+            });
+}
+
+// ===================== GET PROJECT =====================
+void ModrithAPI::getProject(QString slug)
+{
+    QUrl url(apiUrl + "/project/" + slug);
+
+    QNetworkRequest req(url);
+    req.setRawHeader("User-Agent", "MinecraftLauncher/1.0 (Qt)");
+
+    QNetworkReply* reply = manager.get(req);
+
+    connect(reply, &QNetworkReply::finished, this, [this, reply]()
+            {
+                reply->deleteLater();
+
+                if (reply->error() != QNetworkReply::NoError)
+                {
+                    emit OnError(reply->errorString());
+                    return;
+                }
+
+                QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+                if (!doc.isObject())
+                {
+                    emit OnError("Invalid JSON");
+                    return;
+                }
+
+                QJsonObject obj = doc.object();
                 ModProject project;
 
-                project.title =
-                    obj["title"].toString();
+                project.title = obj["title"].toString();
+                project.description = obj["description"].toString();
+                project.body = obj["body"].toString();
+                project.iconUrl = obj["icon_url"].toString();
+                project.license = obj["license"].toObject()["id"].toString();
+                project.downloads = obj["downloads"].toInt();
+                project.updated = obj["date_modified"].toString();
 
-                project.description =
-                    obj["description"].toString();
+                QJsonArray cats = obj["categories"].toArray();
+                for (const auto& c : cats)
+                    project.categories.push_back(c.toString());
 
-                project.body =
-                    obj["body"].toString();
+                QJsonArray gallery = obj["gallery"].toArray();
+                for (const auto& img : gallery)
+                    project.gallery.push_back(img.toObject()["url"].toString());
 
-                project.iconUrl =
-                    obj["icon_url"].toString();
-
-                project.license =
-                    obj["license"]
-                        .toObject()["id"]
-                        .toString();
-
-                project.downloads =
-                    obj["downloads"].toInt();
-
-                project.updated =
-                    obj["updated"].toString();
-
-                QJsonArray categories =
-                    obj["categories"].toArray();
-
-                for(const auto& cat :
-                     categories)
-                {
-                    project.categories
-                        .push_back(
-                            cat.toString());
-                }
-
-                QJsonArray gallery =
-                    obj["gallery"].toArray();
-
-                for(const auto& image :
-                     gallery)
-                {
-                    project.gallery
-                        .push_back(
-                            image.toObject()["url"]
-                                .toString());
-                }
-
-                emit ProjectReceived(
-                    project);
+                emit ProjectReceived(project);
             });
 }

@@ -3,7 +3,6 @@
 #include <QDialog>
 #include <QVector>
 #include <QUrl>
-#include <QEvent>
 
 #include "modrinthapi.h"
 
@@ -27,18 +26,17 @@ public:
         settingsWindow = sw;
     }
 
-    void setMinecraftVersion(const QString& version);
 private slots:
-    void onDownloadLinks(
-        const QVector<QUrl>& urls);
-
+    void onDownloadLinks(const QVector<QUrl>& urls);
     void applyFilters();
     void installMod(const Mod& mod);
+    void updateVersionsForLoader();
+    void onAvailableVersions(const QString& loader, const QStringList& versions);
+
 private:
-    QString selectedLoader;
     void clearCards();
-    void addModCards(const QList<Mod>& mods);
-    QString minecraftVersion;
+    void addModCards(const QVector<Mod>& mods);
+    void setupAdvancedFilters();
 
     QLineEdit* searchEdit = nullptr;
     QPushButton* searchButton = nullptr;
@@ -46,11 +44,14 @@ private:
     QScrollArea* scrollArea = nullptr;
     QWidget* cardsWidget = nullptr;
     QVBoxLayout* cardsLayout = nullptr;
+
     QComboBox* versionFilter = nullptr;
     QComboBox* loaderFilter = nullptr;
+    QComboBox* categoryFilter = nullptr;
+    QComboBox* environmentFilter = nullptr;
 
     ModrithAPI* api = nullptr;
     SettingsWindow* settingsWindow = nullptr;
-
-    QVector<Mod> cachedMods;
+protected:
+    bool eventFilter(QObject* obj, QEvent* event) override;
 };

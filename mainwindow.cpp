@@ -2,19 +2,20 @@
 #include <QMessageBox>
 #include <QDebug>
 #include <QVersionNumber>
-#include <algorithm>
 #include <QDir>
 #include <QProcess>
 #include <QFileInfo>
 #include <QCoreApplication>
 #include <QThread>
+#include <QSystemTrayIcon>
+#include <QMenu>
 
 // ==================== MainWindow ====================
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 {
     progressBar = new QProgressBar(this);
-    progressBar->setGeometry(QRect(780, 710, 500, 25));  // середина низа
+    progressBar->setGeometry(QRect(780, 710, 500, 25));
     progressBar->setRange(0, 100);
     progressBar->setValue(0);
     progressBar->hide();
@@ -23,11 +24,31 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     downloader = new MinecraftDownloader(this);
     settingsWindow = new SettingsWindow(this);
 
+    setupTrayIcon();        // ← Добавлено
     setupConnections();
     loadVersions();
 }
 
+void MainWindow::setupTrayIcon()
+{
+    trayIcon = new QSystemTrayIcon(this);
+    trayIcon->setIcon(QIcon(":/icons/minecraft.png")); // если есть иконка, иначе будет стандартная
 
+    if (trayIcon->icon().isNull())
+        trayIcon->setIcon(style()->standardIcon(QStyle::SP_ComputerIcon));
+
+    QMenu* trayMenu = new QMenu(this);
+    trayMenu->addAction("Открыть лаунчер", this, &MainWindow::show);
+    trayMenu->addAction("Выход", this, &QWidget::close);
+
+    trayIcon->setContextMenu(trayMenu);
+    trayIcon->show();
+
+    connect(trayIcon, &QSystemTrayIcon::activated, this, [this](QSystemTrayIcon::ActivationReason reason) {
+        if (reason == QSystemTrayIcon::DoubleClick)
+            this->show();
+    });
+}
 void MainWindow::setupConnections()
 {
     connect(downloader, &MinecraftDownloader::downloadProgress, this,
@@ -136,24 +157,16 @@ void MainWindow::on_PlayButton_clicked()
         return;
     }
 
-    QString nativesPath = versionDir + "/natives";
-
-#ifdef Q_OS_WIN
-    QString separator = ";";
-#else
-    QString separator = ":";
-#endif
-
+    // ==================== ClassPath ====================
+    QString separator = QDir::separator() == '\\' ? ";" : ":";
     QString classPath;
     QJsonArray libraries = root["libraries"].toArray();
 
     for (const auto& value : libraries) {
         QJsonObject lib = value.toObject();
         QJsonObject downloads = lib["downloads"].toObject();
-
         if (downloads.contains("artifact")) {
-            QJsonObject artifact = downloads["artifact"].toObject();
-            QString path = artifact["path"].toString();
+            QString path = downloads["artifact"].toObject()["path"].toString();
             if (!path.isEmpty()) {
                 QString fullPath = gameDir + "/libraries/" + path;
                 if (QFileInfo::exists(fullPath)) {
@@ -168,22 +181,17 @@ void MainWindow::on_PlayButton_clicked()
     classPath += versionDir + "/" + version + ".jar";
 
     QString javaPath = settingsWindow->javaPath();
-    if (javaPath.isEmpty()) {
-        javaPath = QDir::toNativeSeparators(QCoreApplication::applicationDirPath() + "/java/bin/javaw.exe");
-    }
-
-    if (!QFileInfo::exists(javaPath)) {
-        javaPath = "javaw";  // системный
+    if (javaPath.isEmpty() || !QFileInfo::exists(javaPath)) {
+        javaPath = "javaw";
     }
 
     QStringList args = {
-        "-Xms2G",
-        "-Xmx6G",
-        "-Djava.library.path=" + nativesPath,
-        "-Dorg.lwjgl.util.Debug=true",
+        "-Xms" + QString::number(settingsWindow->ramAmount()/2) + "G",
+        "-Xmx" + QString::number(settingsWindow->ramAmount()) + "G",
+        "-Djava.library.path=" + versionDir + "/natives",
         "-cp", classPath,
         mainClass,
-        "--username", "Player",
+        "--username", settingsWindow->username(),
         "--version", version,
         "--gameDir", gameDir,
         "--assetsDir", gameDir + "/assets",
@@ -192,31 +200,37 @@ void MainWindow::on_PlayButton_clicked()
         "--userType", "legacy"
     };
 
-    QThread* thread = new QThread;
-    connect(thread, &QThread::finished, thread, &QThread::deleteLater);
+    // Запуск Minecraft
+    minecraftProcess = new QProcess(this);
+    connect(minecraftProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &MainWindow::onMinecraftFinished);
 
-    connect(thread, &QThread::started, [args, javaPath] {
-        QProcess* process = new QProcess(nullptr);
-        connect(process, &QProcess::readyReadStandardOutput, [process] {
-            qDebug().noquote() << process->readAllStandardOutput();
-        });
+    minecraftProcess->start(javaPath, args);
 
-        connect(process, &QProcess::readyReadStandardError, [process] {
-            qCritical().noquote() << process->readAllStandardError();
-        });
+    if (!minecraftProcess->waitForStarted(5000)) {
+        QMessageBox::warning(this, "Ошибка", "Не удалось запустить Minecraft");
+        delete minecraftProcess;
+        minecraftProcess = nullptr;
+        return;
+    }
 
-        process->start(javaPath, args);
-        if (!process->waitForStarted()) {
-            qCritical() << "Failed to start Java:" << process->errorString();
-            return;
-        }
+    // Сворачиваем лаунчер в трей
+    hide();
+}
 
-        process->waitForFinished(-1);
+void MainWindow::onMinecraftFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    if (minecraftProcess) {
+        minecraftProcess->deleteLater();
+        minecraftProcess = nullptr;
+    }
 
-        qDebug() << "Java exited with code" << process->exitCode();
-    });
+    // Разворачиваем лаунчер обратно
+    show();
+    activateWindow();
+    raise();
 
-    thread->start();
+    QString message = (exitCode == 0) ? "Minecraft завершён успешно" : "Minecraft завершён (код: " + QString::number(exitCode) + ")";
 }
 
 void MainWindow::on_UpdateButton_clicked()

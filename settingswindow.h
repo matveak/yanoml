@@ -20,9 +20,10 @@ public:
     int ramAmount() const;
     QString minecraftPath() const;
     QString javaPath() const;
+    QString username() const;           // ← Новый метод
 
-    signals:
-        void settingsChanged();
+signals:
+    void settingsChanged();
 
 private:
     QCheckBox* snapshotsCheckBox = nullptr;
@@ -34,5 +35,8 @@ private:
 
     QLineEdit* javaPathEdit = nullptr;
     QPushButton* javaBrowseButton = nullptr;
+
+    QLineEdit* usernameEdit = nullptr;   // ← Новое поле
+
     QSettings settings{"MyLauncher", "Crack"};
 };

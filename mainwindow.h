@@ -1,5 +1,4 @@
-#ifndef MAINWINDOW_H
-#define MAINWINDOW_H
+
 #include <QCheckBox>
 #include "ui_MainWindow.h"
 #include "modwindow.h"
@@ -13,16 +12,22 @@
 #include <QDesktopServices>
 #include <QUrl>
 #include <QProgressBar>
+#define MAINWINDOW_H
+#include <QCheckBox>
+#include "ui_MainWindow.h"
+#include "modwindow.h"
+#include "MinecraftDownloader.h"
+#include <QMainWindow>
+#include <QSystemTrayIcon>
+#include <QProcess>
 
-class MainWindow : public QMainWindow, private Ui::MainWindow
-{
+class MainWindow : public QMainWindow, private Ui::MainWindow {
     Q_OBJECT
 
 public:
     explicit MainWindow(QWidget *parent = nullptr);
 
 private slots:
-//    void on_CreateModpackButton_clicked();
     void onLoaderChanged(const QString& loader);
     void onShowSnapshotsChanged(int state);
 
@@ -30,6 +35,7 @@ private slots:
     void onFabricVersionsReceived(const QJsonArray& versions);
     void onForgeVersionsReceived(const QJsonObject& versions);
     void onNeoForgeVersionReceived(const QString& xml);
+
     void on_PlayButton_clicked();
     void on_ModPlatformButton_clicked();
     void on_UpdateButton_clicked();
@@ -37,19 +43,19 @@ private slots:
     void on_SettingsButton_clicked();
     void on_PickAccountButton_clicked();
     void on_InstallerButton_clicked();
-    //void requestElyProfile();
+
+    void onMinecraftFinished(int exitCode, QProcess::ExitStatus exitStatus); // ← Новый слот
+
 private:
-    QProgressBar* globalProgressBar = nullptr;
     QProgressBar* progressBar = nullptr;
-    QNetworkAccessManager networkManager;
-    //QOAuth2AuthorizationCodeFlow* elyAuth = nullptr;
+    QSystemTrayIcon* trayIcon = nullptr;        // ← Новый
+    QProcess* minecraftProcess = nullptr;       // ← Новый
+
     SettingsWindow* settingsWindow = nullptr;
+    MinecraftDownloader* downloader = nullptr;
     QComboBox* LoaderBox = nullptr;
 
-    MinecraftDownloader* downloader = nullptr;
-
     void setupConnections();
-    void loadVersions();                    // Загрузка версий при старте
+    void setupTrayIcon();                       // ← Новый метод
+    void loadVersions();
 };
-
-#endif // MAINWINDOW_H
