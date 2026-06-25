@@ -12,7 +12,6 @@
 #include <QJsonArray>
 #include <QStringList>
 #include <QVersionNumber>
-#include <QSet>
 
 enum class SortOrder
 {
@@ -87,6 +86,5 @@ public:
 
 private:
     void useFallbackVersions(const QString& loader);
-    void fetchAvailableVersionsPage(const QString& loader, int offset, QSet<QString>* versionsSet);
     QString apiUrl = "https://api.modrinth.com/v2";
 };
