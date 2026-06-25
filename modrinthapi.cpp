@@ -311,20 +311,24 @@ void ModrithAPI::getDownloadLinks(QString slug,
                             if (!fileUrl.isEmpty())
                             {
                                 links.push_back(QUrl(fileUrl));
-                                break;
+                                break;  // Найден primary файл в этой версии
                             }
                         }
                     }
 
+                    // === ИСПРАВЛЕНИЕ: Не прерываем цикл здесь ===
+                    // Если ссылка найдена, выходим только если она не пустая
                     if (!links.isEmpty())
-                        break; // нашли подходящий — выходим
+                        break; // нашли подходящий — выходим из цикла версий
                 }
 
                 if (links.isEmpty())
                 {
-                    emit OnError("No matching versions found for " + minecraftVersion +
-                                 " + " + loader + "\n\n"
-                                                  "Мод может не поддерживать эту версию.");
+                    qDebug() << "DEBUG: Не найдено ссылок для загрузки. Версия:" << minecraftVersion << "Загрузчик:" << loader;
+                    emit OnError("Не найдено подходящей версии мода для:\n"
+                                 "Minecraft: " + (minecraftVersion.isEmpty() ? "Любая" : minecraftVersion) + "\n"
+                                 "Загрузчик: " + (loader.isEmpty() ? "Любой" : loader) + "\n\n"
+                                 "Мод может не поддерживать эту комбинацию версии и загрузчика.");
                     return;
                 }
 
