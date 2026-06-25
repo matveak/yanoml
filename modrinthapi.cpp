@@ -130,17 +130,24 @@ void ModrithAPI::getMods(QString query,
             });
 }
 
-// ===================== FETCH VERSIONS =====================
+// ===================== FETCH VERSIONS (WITH PAGINATION) =====================
 void ModrithAPI::fetchAvailableVersions(const QString& loader)
 {
     if (loader.isEmpty()) return;
 
+    // Инициируем сбор всех версий с пагинацией
+    fetchAvailableVersionsPage(loader, 0, new QSet<QString>());
+}
+
+void ModrithAPI::fetchAvailableVersionsPage(const QString& loader, int offset, QSet<QString>* versionsSet)
+{
     QUrl url(apiUrl + "/search");
     QUrlQuery q;
 
     q.addQueryItem("query", "minecraft");
     q.addQueryItem("index", "downloads");
-    q.addQueryItem("limit", "500");  // УВЕЛИЧЕНО с 200 на 500
+    q.addQueryItem("limit", "100");  // МАКСИМАЛЬНЫЙ ЛИМИТ Modrinth API
+    q.addQueryItem("offset", QString::number(offset));
     q.addQueryItem("facets", QString("[\"categories:%1\"]").arg(loader));
 
     url.setQuery(q);
@@ -150,11 +157,12 @@ void ModrithAPI::fetchAvailableVersions(const QString& loader)
 
     QNetworkReply* reply = manager.get(req);
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply, loader]()
+    connect(reply, &QNetworkReply::finished, this, [this, reply, loader, offset, versionsSet]()
             {
                 reply->deleteLater();
 
-                QSet<QString> versionsSet;
+                QJsonArray hits;
+                int totalHits = 0;
 
                 // Пытаемся получить версии из API
                 if (reply->error() == QNetworkReply::NoError)
@@ -163,9 +171,11 @@ void ModrithAPI::fetchAvailableVersions(const QString& loader)
                     QJsonDocument doc = QJsonDocument::fromJson(reply->readAll(), &err);
                     if (err.error == QJsonParseError::NoError)
                     {
-                        QJsonArray hits = doc.object()["hits"].toArray();
-                        qDebug() << "Получено модов из API:" << hits.size();
+                        hits = doc.object()["hits"].toArray();
+                        totalHits = doc.object()["total_hits"].toInt(0);
                         
+                        qDebug() << "Страница" << (offset / 100 + 1) << "| Получено модов:" << hits.size() << "| Всего:" << totalHits;
+
                         for (const auto& hit : hits)
                         {
                             QJsonArray gameVersions = hit.toObject()["versions"].toArray();
@@ -173,44 +183,57 @@ void ModrithAPI::fetchAvailableVersions(const QString& loader)
                             {
                                 QString ver = v.toString().trimmed();
                                 if (!ver.isEmpty() && ver.contains('.'))
-                                    versionsSet.insert(ver);
+                                    versionsSet->insert(ver);
                             }
                         }
-                        
-                        qDebug() << "Найдено уникальных версий:" << versionsSet.size();
-                        qDebug() << "Версии:" << versionsSet.values();
                     }
                 }
 
-                // ==================== Fallback — расширенный список ====================
-                if (versionsSet.size() < 12)
+                // === Если есть ещё результаты, загружаем следующую страницу ===
+                if (hits.size() == 100 && offset + 100 < totalHits)
+                {
+                    qDebug() << "Загружаем следующую страницу...";
+                    fetchAvailableVersionsPage(loader, offset + 100, versionsSet);
+                    return;
+                }
+
+                // === ВСЕ СТРАНИЦЫ ЗАГРУЖЕНЫ ===
+                qDebug() << "Загрузка завершена! Найдено уникальных версий:" << versionsSet->size();
+
+                // ==================== Fallback — если почти ничего не найдено ====================
+                if (versionsSet->size() < 5)
                 {
                     qDebug() << "Используется fallback список версий";
                     
                     if (loader == "forge")
                     {
-                        versionsSet << "1.21.1" << "1.21" << "1.20.1" << "1.20.2" << "1.20"
+                        *versionsSet << "1.21.1" << "1.21" << "1.20.1" << "1.20.2" << "1.20"
                                     << "1.19.2" << "1.19.4" << "1.18.2" << "1.18.1" << "1.17.1"
                                     << "1.16.5" << "1.16.4" << "1.15.2" << "1.14.4" << "1.12.2";
                     }
                     else if (loader == "neoforge")
                     {
-                        versionsSet << "1.21.1" << "1.21" << "1.20.1" << "1.20.2" << "1.20";
+                        *versionsSet << "1.21.1" << "1.21" << "1.20.1" << "1.20.2" << "1.20";
                     }
                     else if (loader == "fabric" || loader == "quilt")
                     {
-                        versionsSet << "1.21.1" << "1.21" << "1.20.1" << "1.20.2" << "1.19.2"
+                        *versionsSet << "1.21.1" << "1.21" << "1.20.1" << "1.20.2" << "1.19.2"
                                     << "1.18.2" << "1.17.1" << "1.16.5";
                     }
                 }
 
-                QStringList versions = versionsSet.values();
+                QStringList versions = versionsSet->values();
                 std::sort(versions.begin(), versions.end(), [](const QString& a, const QString& b) {
                     return QVersionNumber::fromString(a) > QVersionNumber::fromString(b);
                 });
 
                 qDebug() << "Итого версий для отправки:" << versions.size();
+                qDebug() << "Версии:" << versions;
+
                 emit AvailableVersions(loader, versions);
+                
+                // Очистка памяти
+                delete versionsSet;
             });
 }
 
@@ -324,8 +347,6 @@ void ModrithAPI::getDownloadLinks(QString slug,
                         }
                     }
 
-                    // === ИСПРАВЛЕНИЕ: Не прерываем цикл здесь ===
-                    // Если ссылка найдена, выходим только если она не пустая
                     if (!links.isEmpty())
                         break; // нашли подходящий — выходим из цикла версий
                 }
