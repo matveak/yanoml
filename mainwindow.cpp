@@ -18,6 +18,7 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QTextCursor>
+#include <private/qzipreader_p.h>
 
 // ==================== Java Auto-Detection ====================
 
@@ -170,6 +171,152 @@ static QString selectJavaForVersion(const QString& mcVersion,
 #else
     return "java";
 #endif
+}
+
+// ==================== Natives Extraction ====================
+
+// Проверяет правила библиотеки для текущей ОС (allow/disallow).
+static bool nativeLibraryAllowedOnCurrentOS(const QJsonObject& lib)
+{
+    QJsonArray rules = lib["rules"].toArray();
+    if (rules.isEmpty())
+        return true;
+
+    bool allowed = false;
+
+    for (const auto& rv : rules)
+    {
+        QJsonObject rule = rv.toObject();
+        QString action   = rule["action"].toString();
+
+        if (rule.contains("os"))
+        {
+            QString osName = rule["os"].toObject()["name"].toString();
+#ifdef Q_OS_WIN
+            QString cur = "windows";
+#elif defined(Q_OS_MAC)
+            QString cur = "osx";
+#else
+            QString cur = "linux";
+#endif
+            if (osName == cur) allowed = (action == "allow");
+        }
+        else
+        {
+            allowed = (action == "allow");
+        }
+    }
+
+    return allowed;
+}
+
+// Распаковывает нативные библиотеки (LWJGL .dll/.so/.dylib) из скачанных
+// classifier-джарников в каталог natives. Без этого шага старые версии
+// (до 1.19, использующие classifiers) падают: java.library.path указывает
+// на пустую папку и LWJGL не может загрузить нативные библиотеки.
+static void extractNativesForVersion(const QJsonObject& root,
+                                     const QString& gameDir,
+                                     const QString& nativesDir)
+{
+    QDir().mkpath(nativesDir);
+
+    QJsonArray libraries = root["libraries"].toArray();
+
+    for (const auto& value : libraries)
+    {
+        QJsonObject lib = value.toObject();
+
+        if (!nativeLibraryAllowedOnCurrentOS(lib))
+            continue;
+
+        QJsonObject downloads = lib["downloads"].toObject();
+        if (!downloads.contains("classifiers"))
+            continue;
+
+        QJsonObject classifiers = downloads["classifiers"].toObject();
+
+        // Выбираем classifier для текущей ОС — так же, как при скачивании.
+        QString nativeKey;
+#ifdef Q_OS_WIN
+        if (classifiers.contains("natives-windows"))
+            nativeKey = "natives-windows";
+        else if (classifiers.contains("natives-windows-64"))
+            nativeKey = "natives-windows-64";
+#elif defined(Q_OS_MAC)
+        if (classifiers.contains("natives-osx"))
+            nativeKey = "natives-osx";
+        else if (classifiers.contains("natives-macos"))
+            nativeKey = "natives-macos";
+#else
+        if (classifiers.contains("natives-linux"))
+            nativeKey = "natives-linux";
+#endif
+        if (nativeKey.isEmpty())
+            continue;
+
+        QString relPath = classifiers[nativeKey].toObject()["path"].toString();
+        if (relPath.isEmpty())
+            continue;
+
+        QString jarPath = gameDir + "/libraries/" + relPath;
+        if (!QFileInfo::exists(jarPath))
+        {
+            qWarning() << "Native jar not found, skipping:" << jarPath;
+            continue;
+        }
+
+        // Список исключений из version.json (обычно META-INF/).
+        QStringList excludes;
+        QJsonArray excludeArr =
+            lib["extract"].toObject()["exclude"].toArray();
+        for (const auto& ev : excludeArr)
+            excludes << ev.toString();
+        if (excludes.isEmpty())
+            excludes << "META-INF/";
+
+        QZipReader zip(jarPath);
+        if (!zip.isReadable())
+        {
+            qWarning() << "Cannot read native jar:" << jarPath;
+            continue;
+        }
+
+        const auto entries = zip.fileInfoList();
+        for (const auto& entry : entries)
+        {
+            if (!entry.isFile)
+                continue;
+
+            bool excluded = false;
+            for (const QString& ex : excludes)
+            {
+                if (entry.filePath.startsWith(ex))
+                {
+                    excluded = true;
+                    break;
+                }
+            }
+            if (excluded)
+                continue;
+
+            // Раскладываем только сами библиотеки в плоскую папку natives.
+            QString outName = QFileInfo(entry.filePath).fileName();
+            if (outName.isEmpty())
+                continue;
+
+            QString outPath = nativesDir + "/" + outName;
+            QFile out(outPath);
+            if (out.open(QIODevice::WriteOnly))
+            {
+                out.write(zip.fileData(entry.filePath));
+                out.close();
+            }
+            else
+            {
+                qWarning() << "Cannot write native:" << outPath;
+            }
+        }
+    }
 }
 
 // ==================== MainWindow ====================
@@ -409,6 +556,11 @@ void MainWindow::on_PlayButton_clicked()
 
     if (!classPath.isEmpty()) classPath += sep;
     classPath += versionDir + "/" + version + ".jar";
+
+    // ── Natives ──────────────────────────────────────────────────────────────
+    // Распаковываем нативные библиотеки в versions/<id>/natives.
+    // Без этого старые версии (использующие classifiers) падают при запуске.
+    extractNativesForVersion(root, gameDir, versionDir + "/natives");
 
     // ── RAM ────────────────────────────────────────────────────────────────
 
