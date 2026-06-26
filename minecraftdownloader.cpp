@@ -4,6 +4,8 @@
 #include <QDebug>
 #include <QDir>
 #include <QFileInfo>
+#include <QCryptographicHash>
+#include <QProcess>
 
 MinecraftDownloader::MinecraftDownloader(QObject* parent)
     : QObject(parent)
@@ -547,6 +549,7 @@ void MinecraftDownloader::createInstance(
                                         for (auto it = objects.begin(); it != objects.end(); ++it)
                                         {
                                             QString hash   = it.value().toObject()["hash"].toString();
+                                            int     expSize = it.value().toObject()["size"].toInt();
                                             QString subdir = hash.left(2);
 
                                             QString objectUrl =
@@ -558,54 +561,799 @@ void MinecraftDownloader::createInstance(
 
                                             QDir().mkpath(QFileInfo(objectPath).path());
 
-                                            // Skip already-cached assets
+                                            // Используем кэш только если файл цел (совпадает размер).
+                                            // Битые/обрезанные объекты (например иконка окна)
+                                            // перекачиваются заново — иначе краш "Could not load icon".
                                             if (QFileInfo::exists(objectPath))
                                             {
-                                                ++(*downloaded);
-                                                emit totalProgress((*downloaded * 100) / total);
-                                                if (*downloaded >= total)
+                                                if (expSize <= 0 ||
+                                                    QFileInfo(objectPath).size() == expSize)
                                                 {
-                                                    emit instanceCreated(instancePath);
-                                                    delete downloaded;
+                                                    markAssetDone(downloaded, total, instancePath);
+                                                    continue;
                                                 }
-                                                continue;
+
+                                                QFile::remove(objectPath);
                                             }
 
-                                            QNetworkReply* objReply =
-                                                manager.get(QNetworkRequest(QUrl(objectUrl)));
-
-                                            QFile* file = new QFile(objectPath);
-                                            file->open(QIODevice::WriteOnly);
-
-                                            connect(objReply, &QNetworkReply::readyRead, this,
-                                                    [objReply, file]()
-                                                    {
-                                                        file->write(objReply->readAll());
-                                                    });
-
-                                            connect(objReply, &QNetworkReply::finished, this,
-                                                    [=]() mutable
-                                                    {
-                                                        // Flush any final bytes
-                                                        QByteArray tail = objReply->readAll();
-                                                        if (!tail.isEmpty())
-                                                            file->write(tail);
-
-                                                        file->close();
-                                                        file->deleteLater();
-                                                        objReply->deleteLater();
-
-                                                        ++(*downloaded);
-                                                        emit totalProgress((*downloaded * 100) / total);
-
-                                                        if (*downloaded >= total)
-                                                        {
-                                                            emit instanceCreated(instancePath);
-                                                            delete downloaded;
-                                                        }
-                                                    });
+                                            downloadAssetObject(QUrl(objectUrl), objectPath, hash,
+                                                                downloaded, total, instancePath, 0);
                                         }
                                     });
                         });
+            });
+}
+
+// ==================== ASSET OBJECT ====================
+
+void MinecraftDownloader::markAssetDone(int* downloaded, int total,
+                                        const QString& instancePath)
+{
+    ++(*downloaded);
+    emit totalProgress((*downloaded * 100) / total);
+
+    if (*downloaded >= total)
+    {
+        emit instanceCreated(instancePath);
+        delete downloaded;
+    }
+}
+
+void MinecraftDownloader::downloadAssetObject(const QUrl& url,
+                                              const QString& outputPath,
+                                              const QString& expectedHash,
+                                              int* downloaded,
+                                              int total,
+                                              const QString& instancePath,
+                                              int attempt)
+{
+    QNetworkReply*      reply = manager.get(QNetworkRequest(url));
+    QSaveFile*          file  = new QSaveFile(outputPath);
+    QCryptographicHash* sha1  = new QCryptographicHash(QCryptographicHash::Sha1);
+
+    if (!file->open(QIODevice::WriteOnly))
+    {
+        delete sha1;
+        file->deleteLater();
+        reply->deleteLater();
+        emit errorOccurred("Не удалось открыть файл для записи: " + outputPath);
+        markAssetDone(downloaded, total, instancePath);
+        return;
+    }
+
+    connect(reply, &QNetworkReply::readyRead, this, [reply, file, sha1]()
+            {
+                QByteArray chunk = reply->readAll();
+                file->write(chunk);
+                sha1->addData(chunk);
+            });
+
+    connect(reply, &QNetworkReply::finished, this,
+            [this, reply, file, sha1, url, outputPath, expectedHash,
+             downloaded, total, instancePath, attempt]()
+            {
+                QByteArray tail = reply->readAll();
+                if (!tail.isEmpty())
+                {
+                    file->write(tail);
+                    sha1->addData(tail);
+                }
+
+                bool    netOk   = (reply->error() == QNetworkReply::NoError);
+                QString gotHash = QString::fromLatin1(sha1->result().toHex());
+                bool    hashOk  = expectedHash.isEmpty() || (gotHash == expectedHash);
+
+                delete sha1;
+                reply->deleteLater();
+
+                if (netOk && hashOk)
+                {
+                    file->commit();
+                    file->deleteLater();
+                    markAssetDone(downloaded, total, instancePath);
+                    return;
+                }
+
+                // Не оставляем битый файл на диске.
+                file->cancelWriting();
+                file->deleteLater();
+
+                if (attempt < 2)
+                {
+                    downloadAssetObject(url, outputPath, expectedHash,
+                                        downloaded, total, instancePath, attempt + 1);
+                    return;
+                }
+
+                emit errorOccurred("Не удалось скачать ассет (битый файл): " + outputPath);
+                markAssetDone(downloaded, total, instancePath);
+            });
+}
+
+// ==================== JAVA RUNTIME ====================
+
+void MinecraftDownloader::downloadJavaRuntime(const QString& component,
+                                              const QString& outputDir)
+{
+#if defined(Q_OS_WIN)
+#  if defined(Q_PROCESSOR_ARM)
+    const QString platformKey = "windows-arm64";
+#  else
+    const QString platformKey = "windows-x64";
+#  endif
+#elif defined(Q_OS_MAC)
+#  if defined(Q_PROCESSOR_ARM)
+    const QString platformKey = "mac-os-arm64";
+#  else
+    const QString platformKey = "mac-os";
+#  endif
+#else
+#  if defined(Q_PROCESSOR_X86_32)
+    const QString platformKey = "linux-i386";
+#  else
+    const QString platformKey = "linux";
+#  endif
+#endif
+
+    QDir().mkpath(outputDir);
+
+    // Список всех доступных Java runtime от Mojang.
+    const QString allUrl =
+        "https://launchermeta.mojang.com/v1/products/java-runtime/"
+        "2ec0cc96c44e5a76b9c8b7c39df7210883d12871/all.json";
+
+    QNetworkReply* allReply = manager.get(QNetworkRequest(QUrl(allUrl)));
+
+    connect(allReply, &QNetworkReply::finished, this,
+            [this, allReply, platformKey, component, outputDir]()
+            {
+                allReply->deleteLater();
+
+                if (allReply->error() != QNetworkReply::NoError)
+                {
+                    emit errorOccurred(allReply->errorString());
+                    return;
+                }
+
+                QJsonObject root =
+                    QJsonDocument::fromJson(allReply->readAll()).object();
+
+                QJsonArray comps =
+                    root[platformKey].toObject()[component].toArray();
+
+                if (comps.isEmpty())
+                {
+                    emit errorOccurred("Java runtime не найдена: " +
+                                       platformKey + "/" + component);
+                    return;
+                }
+
+                QString manifestUrl = comps[0].toObject()["manifest"]
+                                          .toObject()["url"].toString();
+
+                if (manifestUrl.isEmpty())
+                {
+                    emit errorOccurred("Нет ссылки на manifest Java runtime");
+                    return;
+                }
+
+                // ── Manifest со списком файлов runtime ───────────────────────
+                QNetworkReply* manReply =
+                    manager.get(QNetworkRequest(QUrl(manifestUrl)));
+
+                connect(manReply, &QNetworkReply::finished, this,
+                        [this, manReply, outputDir]()
+                        {
+                            manReply->deleteLater();
+
+                            if (manReply->error() != QNetworkReply::NoError)
+                            {
+                                emit errorOccurred(manReply->errorString());
+                                return;
+                            }
+
+                            QJsonObject files =
+                                QJsonDocument::fromJson(manReply->readAll())
+                                    .object()["files"].toObject();
+
+                            struct DlItem { QString url; QString path; bool executable; };
+                            QVector<DlItem> items;
+                            QString javaExe;
+
+                            for (auto it = files.begin(); it != files.end(); ++it)
+                            {
+                                const QString rel  = it.key();
+                                QJsonObject entry  = it.value().toObject();
+                                const QString type = entry["type"].toString();
+                                const QString outPath = outputDir + "/" + rel;
+
+                                if (type == "directory")
+                                {
+                                    QDir().mkpath(outPath);
+                                    continue;
+                                }
+                                if (type != "file")
+                                    continue; // symlink — пропускаем
+
+                                QDir().mkpath(QFileInfo(outPath).path());
+
+                                const bool exe = entry["executable"].toBool();
+
+                                if (rel.endsWith("bin/javaw.exe") ||
+                                    (javaExe.isEmpty() && rel.endsWith("bin/java")))
+                                    javaExe = outPath;
+
+                                QString rawUrl = entry["downloads"].toObject()["raw"]
+                                                     .toObject()["url"].toString();
+                                if (rawUrl.isEmpty())
+                                    continue;
+
+                                items.push_back({ rawUrl, outPath, exe });
+                            }
+
+                            if (items.isEmpty())
+                            {
+                                emit errorOccurred("Manifest Java runtime пуст");
+                                return;
+                            }
+                            if (javaExe.isEmpty())
+                                javaExe = outputDir + "/bin/javaw.exe";
+
+                            const int total = items.size();
+                            int* done = new int(0);
+
+                            auto finishOne = [this, total, done, javaExe]()
+                            {
+                                ++(*done);
+                                emit javaRuntimeProgress((*done * 100) / total);
+                                if (*done >= total)
+                                {
+                                    emit javaRuntimeReady(javaExe);
+                                    delete done;
+                                }
+                            };
+
+                            for (const DlItem& item : items)
+                            {
+                                if (QFileInfo::exists(item.path))
+                                {
+                                    finishOne();
+                                    continue;
+                                }
+
+                                QNetworkReply* fileReply =
+                                    manager.get(QNetworkRequest(QUrl(item.url)));
+                                QFile* f = new QFile(item.path);
+
+                                if (!f->open(QIODevice::WriteOnly))
+                                {
+                                    f->deleteLater();
+                                    fileReply->deleteLater();
+                                    finishOne();
+                                    continue;
+                                }
+
+                                connect(fileReply, &QNetworkReply::readyRead, this,
+                                        [fileReply, f]()
+                                        {
+                                            f->write(fileReply->readAll());
+                                        });
+
+                                connect(fileReply, &QNetworkReply::finished, this,
+                                        [=]()
+                                        {
+                                            QByteArray tail = fileReply->readAll();
+                                            if (!tail.isEmpty())
+                                                f->write(tail);
+                                            f->close();
+
+                                            if (item.executable)
+                                                f->setPermissions(f->permissions()
+                                                    | QFileDevice::ExeOwner
+                                                    | QFileDevice::ExeGroup
+                                                    | QFileDevice::ExeOther);
+
+                                            f->deleteLater();
+                                            fileReply->deleteLater();
+                                            finishOne();
+                                        });
+                            }
+                        });
+            });
+}
+
+// ==================== MOD LOADERS ====================
+
+QString MinecraftDownloader::mavenNameToPath(const QString& name)
+{
+    // group:artifact:version[:classifier][@ext]
+    QString work = name;
+    QString ext = "jar";
+
+    const int at = work.indexOf('@');
+    if (at >= 0)
+    {
+        ext  = work.mid(at + 1);
+        work = work.left(at);
+    }
+
+    const QStringList parts = work.split(':');
+    if (parts.size() < 3)
+        return QString();
+
+    QString group      = parts[0];
+    const QString artifact   = parts[1];
+    const QString version    = parts[2];
+    const QString classifier = parts.size() >= 4 ? parts[3] : QString();
+
+    QString file = artifact + "-" + version;
+    if (!classifier.isEmpty())
+        file += "-" + classifier;
+    file += "." + ext;
+
+    return group.replace('.', '/') + "/" + artifact + "/" + version + "/" + file;
+}
+
+QString MinecraftDownloader::findInstalledLoaderId(const QString& gameDir,
+                                                   const QString& loader,
+                                                   const QString& mcVersion)
+{
+    const QString versionsRoot = gameDir + "/versions";
+    QDir d(versionsRoot);
+    if (!d.exists())
+        return QString();
+
+    const QString loaderLower = loader.toLower();
+    QString best;
+
+    const QStringList dirs = d.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+    for (const QString& dir : dirs)
+    {
+        const QString lower = dir.toLower();
+
+        bool match = false;
+        if (loaderLower == "fabric")        match = lower.contains("fabric");
+        else if (loaderLower == "quilt")    match = lower.contains("quilt");
+        else if (loaderLower == "neoforge") match = lower.contains("neoforge");
+        else if (loaderLower == "forge")    match = lower.contains("forge") &&
+                                                    !lower.contains("neoforge");
+        if (!match)
+            continue;
+
+        QFile f(versionsRoot + "/" + dir + "/" + dir + ".json");
+        if (!f.open(QIODevice::ReadOnly))
+            continue;
+
+        const QJsonObject obj = QJsonDocument::fromJson(f.readAll()).object();
+        f.close();
+
+        if (obj["inheritsFrom"].toString() != mcVersion)
+            continue;
+
+        // Берём лексикографически «наибольший» — обычно это более свежий билд.
+        if (best.isEmpty() || dir > best)
+            best = dir;
+    }
+
+    return best;
+}
+
+void MinecraftDownloader::installFabric(const QString& mcVersion, const QString& gameDir)
+{
+    const QString loaderListUrl =
+        "https://meta.fabricmc.net/v2/versions/loader/" + mcVersion;
+
+    QNetworkReply* listReply =
+        manager.get(QNetworkRequest(QUrl(loaderListUrl)));
+
+    connect(listReply, &QNetworkReply::finished, this, [=]()
+            {
+                listReply->deleteLater();
+
+                if (listReply->error() != QNetworkReply::NoError)
+                {
+                    emit errorOccurred(listReply->errorString());
+                    return;
+                }
+
+                const QJsonArray arr =
+                    QJsonDocument::fromJson(listReply->readAll()).array();
+
+                if (arr.isEmpty())
+                {
+                    emit errorOccurred("Fabric не поддерживает версию " + mcVersion);
+                    return;
+                }
+
+                const QString loaderVersion =
+                    arr[0].toObject()["loader"].toObject()["version"].toString();
+
+                if (loaderVersion.isEmpty())
+                {
+                    emit errorOccurred("Не удалось определить версию Fabric Loader");
+                    return;
+                }
+
+                const QString profileUrl =
+                    "https://meta.fabricmc.net/v2/versions/loader/" + mcVersion +
+                    "/" + loaderVersion + "/profile/json";
+
+                QNetworkReply* profReply =
+                    manager.get(QNetworkRequest(QUrl(profileUrl)));
+
+                connect(profReply, &QNetworkReply::finished, this, [=]()
+                        {
+                            profReply->deleteLater();
+
+                            if (profReply->error() != QNetworkReply::NoError)
+                            {
+                                emit errorOccurred(profReply->errorString());
+                                return;
+                            }
+
+                            const QByteArray profData = profReply->readAll();
+                            const QJsonObject profile =
+                                QJsonDocument::fromJson(profData).object();
+
+                            QString versionId = profile["id"].toString();
+                            if (versionId.isEmpty())
+                                versionId = "fabric-loader-" + loaderVersion +
+                                            "-" + mcVersion;
+
+                            // Сохраняем профиль загрузчика как отдельную версию.
+                            const QString verDir =
+                                gameDir + "/versions/" + versionId;
+                            QDir().mkpath(verDir);
+
+                            QFile vf(verDir + "/" + versionId + ".json");
+                            if (vf.open(QIODevice::WriteOnly))
+                            {
+                                vf.write(profData);
+                                vf.close();
+                            }
+
+                            // Скачиваем библиотеки Fabric.
+                            const QJsonArray libs =
+                                profile["libraries"].toArray();
+                            const QString libDir = gameDir + "/libraries";
+
+                            struct Item { QUrl url; QString path; };
+                            QVector<Item> items;
+
+                            for (const auto& lv : libs)
+                            {
+                                const QJsonObject lib = lv.toObject();
+                                const QString name = lib["name"].toString();
+                                if (name.isEmpty())
+                                    continue;
+
+                                const QString rel = mavenNameToPath(name);
+                                if (rel.isEmpty())
+                                    continue;
+
+                                QString base = lib["url"].toString();
+                                if (base.isEmpty())
+                                    base = "https://maven.fabricmc.net/";
+                                if (!base.endsWith('/'))
+                                    base += '/';
+
+                                items.push_back({ QUrl(base + rel),
+                                                  libDir + "/" + rel });
+                            }
+
+                            if (items.isEmpty())
+                            {
+                                emit loaderInstalled(versionId);
+                                return;
+                            }
+
+                            const int total = items.size();
+                            int* done = new int(0);
+
+                            auto finishOne = [this, total, done, versionId]()
+                            {
+                                ++(*done);
+                                emit totalProgress((*done * 100) / total);
+                                if (*done >= total)
+                                {
+                                    emit loaderInstalled(versionId);
+                                    delete done;
+                                }
+                            };
+
+                            for (const Item& item : items)
+                            {
+                                if (QFileInfo::exists(item.path))
+                                {
+                                    finishOne();
+                                    continue;
+                                }
+
+                                QDir().mkpath(QFileInfo(item.path).path());
+
+                                QNetworkReply* r =
+                                    manager.get(QNetworkRequest(item.url));
+                                QSaveFile* f = new QSaveFile(item.path);
+
+                                if (!f->open(QIODevice::WriteOnly))
+                                {
+                                    f->deleteLater();
+                                    r->deleteLater();
+                                    finishOne();
+                                    continue;
+                                }
+
+                                connect(r, &QNetworkReply::readyRead, this,
+                                        [r, f]() { f->write(r->readAll()); });
+
+                                connect(r, &QNetworkReply::finished, this, [=]()
+                                        {
+                                            const QByteArray tail = r->readAll();
+                                            if (!tail.isEmpty())
+                                                f->write(tail);
+
+                                            if (r->error() == QNetworkReply::NoError)
+                                                f->commit();
+                                            else
+                                                f->cancelWriting();
+
+                                            f->deleteLater();
+                                            r->deleteLater();
+                                            finishOne();
+                                        });
+                            }
+                        });
+            });
+}
+
+// Выбирает Maven-версию NeoForge, соответствующую версии Minecraft.
+static QString pickNeoForgeMavenForMc(const QString& xml, const QString& mcVersion,
+                                      bool allowPrerelease)
+{
+    auto toMc = [](const QString& v) -> QString
+    {
+        if (v.startsWith("47."))
+            return "1.20.1";
+        const QStringList parts = v.split('.');
+        if (parts.size() >= 2)
+        {
+            bool okMajor = false, okMinor = false;
+            const int major = parts[0].toInt(&okMajor);
+            const int minor = parts[1].section('-', 0, 0).toInt(&okMinor);
+            if (okMajor && okMinor)
+                return minor == 0 ? QString("1.%1").arg(major)
+                                  : QString("1.%1.%2").arg(major).arg(minor);
+        }
+        return v;
+    };
+
+    QString best;
+    const QStringList lines = xml.split('\n');
+    for (const QString& line : lines)
+    {
+        if (!line.contains("<version>"))
+            continue;
+
+        const QString v = QString(line)
+                              .remove("<version>")
+                              .remove("</version>")
+                              .trimmed();
+
+        const bool pre = v.contains("beta",  Qt::CaseInsensitive) ||
+                         v.contains("alpha", Qt::CaseInsensitive) ||
+                         v.contains("rc",    Qt::CaseInsensitive);
+        if (pre && !allowPrerelease)
+            continue;
+
+        if (toMc(v) != mcVersion)
+            continue;
+
+        // Версии в metadata идут по возрастанию — берём последнюю подходящую.
+        best = v;
+    }
+
+    return best;
+}
+
+void MinecraftDownloader::installForgeLike(const QString& mcVersion,
+                                           const QString& loader,
+                                           const QString& javaExe,
+                                           const QString& gameDir)
+{
+    if (loader == "forge")
+    {
+        QNetworkReply* promoReply = manager.get(QNetworkRequest(QUrl(
+            "https://files.minecraftforge.net/net/minecraftforge/forge/"
+            "promotions_slim.json")));
+
+        connect(promoReply, &QNetworkReply::finished, this, [=]()
+                {
+                    promoReply->deleteLater();
+
+                    if (promoReply->error() != QNetworkReply::NoError)
+                    {
+                        emit errorOccurred(promoReply->errorString());
+                        return;
+                    }
+
+                    const QJsonObject promos =
+                        QJsonDocument::fromJson(promoReply->readAll())
+                            .object()["promos"].toObject();
+
+                    QString fv = promos.value(mcVersion + "-recommended").toString();
+                    if (fv.isEmpty())
+                        fv = promos.value(mcVersion + "-latest").toString();
+
+                    if (fv.isEmpty())
+                    {
+                        emit errorOccurred("Нет версии Forge для " + mcVersion);
+                        return;
+                    }
+
+                    const QString full = mcVersion + "-" + fv;
+                    const QString url =
+                        "https://maven.minecraftforge.net/net/minecraftforge/"
+                        "forge/" + full + "/forge-" + full + "-installer.jar";
+
+                    runLoaderInstaller(QUrl(url), mcVersion, "forge",
+                                       javaExe, gameDir);
+                });
+    }
+    else // neoforge
+    {
+        QNetworkReply* metaReply = manager.get(QNetworkRequest(QUrl(
+            "https://maven.neoforged.net/releases/net/neoforged/neoforge/"
+            "maven-metadata.xml")));
+
+        connect(metaReply, &QNetworkReply::finished, this, [=]()
+                {
+                    metaReply->deleteLater();
+
+                    if (metaReply->error() != QNetworkReply::NoError)
+                    {
+                        emit errorOccurred(metaReply->errorString());
+                        return;
+                    }
+
+                    const QString xml = QString::fromUtf8(metaReply->readAll());
+                    QString chosen = pickNeoForgeMavenForMc(xml, mcVersion, false);
+                    if (chosen.isEmpty())
+                        chosen = pickNeoForgeMavenForMc(xml, mcVersion, true);
+
+                    if (chosen.isEmpty())
+                    {
+                        emit errorOccurred("Нет версии NeoForge для " + mcVersion);
+                        return;
+                    }
+
+                    const QString url =
+                        "https://maven.neoforged.net/releases/net/neoforged/"
+                        "neoforge/" + chosen + "/neoforge-" + chosen +
+                        "-installer.jar";
+
+                    runLoaderInstaller(QUrl(url), mcVersion, "neoforge",
+                                       javaExe, gameDir);
+                });
+    }
+}
+
+void MinecraftDownloader::runLoaderInstaller(const QUrl& installerUrl,
+                                             const QString& mcVersion,
+                                             const QString& loader,
+                                             const QString& javaExe,
+                                             const QString& gameDir)
+{
+    const QString installersDir = gameDir + "/.installers";
+    QDir().mkpath(installersDir);
+    const QString installerPath =
+        installersDir + "/" + loader + "-" + mcVersion + "-installer.jar";
+
+    auto runProc = [=]()
+    {
+        // Установщик Forge/NeoForge требует launcher_profiles.json в каталоге.
+        const QString lp = gameDir + "/launcher_profiles.json";
+        if (!QFileInfo::exists(lp))
+        {
+            QFile f(lp);
+            if (f.open(QIODevice::WriteOnly))
+            {
+                f.write("{\n"
+                        "  \"profiles\": {},\n"
+                        "  \"selectedProfile\": \"\",\n"
+                        "  \"clientToken\": \"\",\n"
+                        "  \"authenticationDatabase\": {},\n"
+                        "  \"launcherVersion\": { \"name\": \"yanoml\", "
+                        "\"format\": 21 }\n"
+                        "}");
+                f.close();
+            }
+        }
+
+        QProcess* proc = new QProcess(this);
+        proc->setWorkingDirectory(gameDir);
+
+        connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+                this, [=](int code, QProcess::ExitStatus)
+                {
+                    const QString out = proc->readAllStandardOutput() +
+                                        proc->readAllStandardError();
+                    proc->deleteLater();
+
+                    if (code != 0)
+                    {
+                        emit errorOccurred("Установщик " + loader +
+                                           " завершился с ошибкой:\n" +
+                                           out.right(2000));
+                        return;
+                    }
+
+                    const QString id =
+                        findInstalledLoaderId(gameDir, loader, mcVersion);
+
+                    if (id.isEmpty())
+                    {
+                        emit errorOccurred("Установщик " + loader +
+                            " завершился, но версия не найдена в versions/.");
+                        return;
+                    }
+
+                    emit loaderInstalled(id);
+                });
+
+        proc->start(javaExe, { "-jar", installerPath,
+                               "--installClient", gameDir });
+
+        if (!proc->waitForStarted(5000))
+        {
+            emit errorOccurred("Не удалось запустить установщик " + loader +
+                               " (Java: " + javaExe + ")");
+            proc->deleteLater();
+        }
+    };
+
+    if (QFileInfo::exists(installerPath))
+    {
+        runProc();
+        return;
+    }
+
+    QNetworkReply* r = manager.get(QNetworkRequest(installerUrl));
+    QSaveFile* f = new QSaveFile(installerPath);
+
+    if (!f->open(QIODevice::WriteOnly))
+    {
+        f->deleteLater();
+        r->deleteLater();
+        emit errorOccurred("Не удалось сохранить установщик " + loader);
+        return;
+    }
+
+    connect(r, &QNetworkReply::downloadProgress,
+            this, &MinecraftDownloader::downloadProgress);
+    connect(r, &QNetworkReply::readyRead, this,
+            [r, f]() { f->write(r->readAll()); });
+
+    connect(r, &QNetworkReply::finished, this, [=]()
+            {
+                const QByteArray tail = r->readAll();
+                if (!tail.isEmpty())
+                    f->write(tail);
+
+                const bool ok = (r->error() == QNetworkReply::NoError);
+                if (ok)
+                    f->commit();
+                else
+                    f->cancelWriting();
+
+                f->deleteLater();
+                r->deleteLater();
+
+                if (!ok)
+                {
+                    emit errorOccurred("Не удалось скачать установщик " + loader);
+                    return;
+                }
+
+                runProc();
             });
 }

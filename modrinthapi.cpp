@@ -24,6 +24,8 @@ ModrithAPI::ModrithAPI(QObject* parent) : QObject(parent) {}
 void ModrithAPI::getMods(QString query,
                          QString mcVersion,
                          QString loader,
+                         QString category,
+                         QString environment,
                          SortOrder order,
                          int first,
                          int count)
@@ -38,6 +40,13 @@ void ModrithAPI::getMods(QString query,
 
     QJsonArray facets;
 
+    // Ищем только моды.
+    {
+        QJsonArray typeGroup;
+        typeGroup.append(QString("project_type:mod"));
+        facets.append(typeGroup);
+    }
+
     // Строгие фильтры
     if (!mcVersion.isEmpty() && mcVersion != "Любая версия")
     {
@@ -51,6 +60,25 @@ void ModrithAPI::getMods(QString query,
         QJsonArray loaderGroup;
         loaderGroup.append(QString("categories:%1").arg(loader));
         facets.append(loaderGroup);
+    }
+
+    if (!category.isEmpty() && category != "Любая категория")
+    {
+        QJsonArray categoryGroup;
+        categoryGroup.append(QString("categories:%1").arg(category));
+        facets.append(categoryGroup);
+    }
+
+    // Окружение: client_side/server_side бывают required/optional —
+    // оба значения подходят, поэтому это OR-группа внутри одного facet.
+    if (!environment.isEmpty() && environment != "Любая среда")
+    {
+        QString sideKey = (environment == "server") ? "server_side" : "client_side";
+
+        QJsonArray envGroup;
+        envGroup.append(QString("%1:required").arg(sideKey));
+        envGroup.append(QString("%1:optional").arg(sideKey));
+        facets.append(envGroup);
     }
 
     if (!facets.isEmpty())
@@ -97,9 +125,12 @@ void ModrithAPI::getMods(QString query,
                     mod.name        = obj["title"].toString();
                     mod.description = obj["description"].toString();
                     mod.downloads   = static_cast<size_t>(obj["downloads"].toDouble());
+                    mod.follows     = static_cast<size_t>(obj["follows"].toDouble());
                     mod.iconURL     = QUrl(obj["icon_url"].toString());
                     mod.author      = obj["author"].toString();
                     mod.color       = static_cast<QRgb>(obj["color"].toDouble());
+                    mod.dateCreated = obj["date_created"].toString();
+                    mod.dateUpdated = obj["date_modified"].toString();
 
                     QJsonArray cats = obj["categories"].toArray();
                     for (const auto& c : cats)
@@ -129,6 +160,16 @@ void ModrithAPI::getMods(QString query,
 
                 emit ModList(mods);
             });
+}
+
+// Минимальная версия Minecraft, начиная с которой существует загрузчик.
+// Null (по умолчанию) — без ограничения.
+static QVersionNumber loaderMinVersion(const QString& loader)
+{
+    if (loader == "neoforge") return QVersionNumber::fromString("1.20.1");
+    if (loader == "quilt")    return QVersionNumber::fromString("1.18.2");
+    if (loader == "fabric")   return QVersionNumber::fromString("1.14");
+    return QVersionNumber();
 }
 
 // ===================== FETCH VERSIONS (FROM TAG ENDPOINT) =====================
@@ -162,7 +203,13 @@ void ModrithAPI::fetchAvailableVersions(const QString& loader)
                         
                         // Регулярное выражение для Minecraft версий (1.XX, 1.XX.X и т.д.)
                         QRegularExpression mcVersionRegex("^1\\.(\\d+)(\\.(\\d+))?$");
-                        
+
+                        // Минимальная версия Minecraft, поддерживаемая загрузчиком.
+                        // /tag/game_version отдаёт ВСЕ версии MC, без привязки к загрузчику,
+                        // поэтому отсекаем те, где загрузчика ещё не существовало
+                        // (NeoForge появился только с 1.20.1, Fabric — с 1.14, Quilt — с 1.18.2).
+                        const QVersionNumber minVer = loaderMinVersion(loader);
+
                         int validVersions = 0;
 
                         // Собираем только версии Minecraft (формата 1.XX.X)
@@ -174,6 +221,10 @@ void ModrithAPI::fetchAvailableVersions(const QString& loader)
                             // Проверяем, что это версия Minecraft (начинается с "1.")
                             if (mcVersionRegex.match(version).hasMatch())
                             {
+                                if (!minVer.isNull()
+                                    && QVersionNumber::fromString(version) < minVer)
+                                    continue;
+
                                 versionsSet.insert(version);
                                 validVersions++;
                                 
@@ -245,6 +296,87 @@ void ModrithAPI::useFallbackVersions(const QString& loader)
     }
 
     emit AvailableVersions(loader, versions);
+}
+
+// ===================== TAG ICONS (CATEGORIES / LOADERS) =====================
+void ModrithAPI::fetchCategories()
+{
+    QUrl url(apiUrl + "/tag/category");
+    QNetworkRequest req(url);
+    req.setRawHeader("User-Agent", "MinecraftLauncher/1.0 (Qt)");
+
+    QNetworkReply* reply = manager.get(req);
+    connect(reply, &QNetworkReply::finished, this, [this, reply]()
+            {
+                reply->deleteLater();
+
+                QVector<TagInfo> out;
+                if (reply->error() == QNetworkReply::NoError)
+                {
+                    QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+                    if (doc.isArray())
+                    {
+                        for (const auto& v : doc.array())
+                        {
+                            QJsonObject o = v.toObject();
+                            if (o["project_type"].toString() != "mod")
+                                continue;
+
+                            TagInfo t;
+                            t.name   = o["name"].toString();
+                            t.icon   = o["icon"].toString();
+                            t.header = o["header"].toString();
+                            out.push_back(t);
+                        }
+                    }
+                }
+                emit CategoriesReceived(out);
+            });
+}
+
+void ModrithAPI::fetchLoaders()
+{
+    QUrl url(apiUrl + "/tag/loader");
+    QNetworkRequest req(url);
+    req.setRawHeader("User-Agent", "MinecraftLauncher/1.0 (Qt)");
+
+    QNetworkReply* reply = manager.get(req);
+    connect(reply, &QNetworkReply::finished, this, [this, reply]()
+            {
+                reply->deleteLater();
+
+                QVector<TagInfo> out;
+                if (reply->error() == QNetworkReply::NoError)
+                {
+                    QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+                    if (doc.isArray())
+                    {
+                        for (const auto& v : doc.array())
+                        {
+                            QJsonObject o = v.toObject();
+
+                            // Только загрузчики, поддерживающие моды.
+                            bool supportsMod = false;
+                            for (const auto& pt : o["supported_project_types"].toArray())
+                            {
+                                if (pt.toString() == "mod")
+                                {
+                                    supportsMod = true;
+                                    break;
+                                }
+                            }
+                            if (!supportsMod)
+                                continue;
+
+                            TagInfo t;
+                            t.name = o["name"].toString();
+                            t.icon = o["icon"].toString();
+                            out.push_back(t);
+                        }
+                    }
+                }
+                emit LoadersReceived(out);
+            });
 }
 
 // ===================== DOWNLOAD LINKS =====================
