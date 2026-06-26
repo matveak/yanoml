@@ -35,6 +35,10 @@ public:
     void downloadVanillaVersion(const QString& versionJsonUrl, const QString& outputJarPath);
     void createInstance(const QString& minecraftVersion, const QString& modLoader, const QString& modLoaderVersion, const QString& instancePath);
 
+    // Скачивает официальную Java от Mojang (component, например "jre-legacy").
+    // По завершении испускает javaRuntimeReady с путём к java/javaw.
+    void downloadJavaRuntime(const QString& component, const QString& outputDir);
+
 
 signals:
     void vanillaVersionsReceived(const QVector<MinecraftVersion>& versions);
@@ -46,6 +50,8 @@ signals:
     void downloadProgress(qint64 bytesReceived, qint64 bytesTotal);
     void errorOccurred(const QString& errorString);
     void instanceCreated(QString path);
+    void javaRuntimeProgress(int percent);
+    void javaRuntimeReady(const QString& javaExecutable);
 private:
     QNetworkAccessManager manager;
     int totalFiles = 0;

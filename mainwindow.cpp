@@ -18,6 +18,7 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QTextCursor>
+#include <memory>
 #include <private/qzipreader_p.h>
 
 // ==================== Java Auto-Detection ====================
@@ -124,53 +125,58 @@ static QMap<int, QString> findInstalledJavas()
     return found;
 }
 
-// Выбирает лучший подходящий путь к Java для данной версии MC
-// Приоритет: минимальная подходящая версия (не берём 21 там, где хватит 8)
-static QString selectJavaForVersion(const QString& mcVersion,
-                                    const QMap<int, QString>& javas,
-                                    const QString& userJavaPath)
+// Совместима ли установленная Java с версией, которую требует Minecraft.
+// Старые версии (LWJGL 3.2.x и раньше) падают на слишком новой Java,
+// поэтому им нужна именно major-версия, указанная Mojang.
+// Современные (Java 17+, LWJGL 3.3+) спокойно работают на более новой Java.
+static bool javaIsCompatible(int installedMajor, int requiredMajor)
 {
-    int needed = requiredJavaMajor(mcVersion);
+    if (installedMajor <= 0)
+        return false;
+    if (installedMajor == requiredMajor)
+        return true;
+    if (requiredMajor >= 17)
+        return installedMajor >= requiredMajor;
+    return false;
+}
 
-    // Сначала проверяем путь пользователя из настроек
+// Ищет среди установленных Java ту, что совместима с требуемой major-версией.
+// Возвращает пустую строку, если подходящей нет (тогда качаем Java от Mojang).
+static QString pickCompatibleInstalledJava(const QMap<int, QString>& javas,
+                                           int requiredMajor,
+                                           const QString& userJavaPath)
+{
     if (!userJavaPath.isEmpty() && QFileInfo::exists(userJavaPath))
     {
         int userMajor = getJavaMajorVersion(userJavaPath);
-        if (userMajor >= needed)
-        {
-            qDebug() << "Using user-specified Java" << userMajor << "for MC" << mcVersion;
+        if (javaIsCompatible(userMajor, requiredMajor))
             return userJavaPath;
-        }
-        qDebug() << "User Java" << userMajor << "too old for MC" << mcVersion
-                 << "(need" << needed << "), searching for better...";
     }
 
-    // Ищем минимальную подходящую версию из найденных
+    if (javas.contains(requiredMajor))
+        return javas[requiredMajor];
+
     QString best;
     int bestMajor = INT_MAX;
-
     for (auto it = javas.constBegin(); it != javas.constEnd(); ++it)
     {
-        int major = it.key();
-        if (major >= needed && major < bestMajor)
+        if (javaIsCompatible(it.key(), requiredMajor) && it.key() < bestMajor)
         {
-            bestMajor = major;
+            bestMajor = it.key();
             best = it.value();
         }
     }
+    return best;
+}
 
-    if (!best.isEmpty())
-    {
-        qDebug() << "Auto-selected Java" << bestMajor << "for MC" << mcVersion;
-        return best;
-    }
-
-    // Ничего не нашли — возвращаем системную java и надеемся на лучшее
-#ifdef Q_OS_WIN
-    return "javaw";
-#else
-    return "java";
-#endif
+// По требуемой major-версии возвращает имя Java-компонента Mojang
+// (используется, если в version.json нет поля javaVersion.component).
+static QString javaComponentForMajor(int requiredMajor)
+{
+    if (requiredMajor <= 8)  return "jre-legacy";
+    if (requiredMajor <= 16) return "java-runtime-alpha";
+    if (requiredMajor <= 17) return "java-runtime-gamma";
+    return "java-runtime-delta";
 }
 
 // ==================== Natives Extraction ====================
@@ -410,6 +416,13 @@ void MainWindow::setupConnections()
                 progressBar->show();
                 progressBar->setValue(percent);
             });
+
+    connect(downloader, &MinecraftDownloader::javaRuntimeProgress, this,
+            [this](int percent)
+            {
+                progressBar->show();
+                progressBar->setValue(percent);
+            });
 }
 
 // ==================== Installer ====================
@@ -482,18 +495,79 @@ void MainWindow::on_PlayButton_clicked()
         return;
     }
 
-    // ── Java: автовыбор ────────────────────────────────────────────────────
+    // ── Java: автовыбор / авто-скачивание ──────────────────────────────────
 
-    QString javaPath = selectJavaForVersion(
-        version,
-        installedJavas,
-        settingsWindow->javaPath());
+    QJsonObject javaVer = root["javaVersion"].toObject();
+    int requiredMajor = javaVer["majorVersion"].toInt();
+    if (requiredMajor <= 0)
+        requiredMajor = requiredJavaMajor(version);
 
-    int neededJava  = requiredJavaMajor(version);
+    QString javaComponent = javaVer["component"].toString();
+    if (javaComponent.isEmpty())
+        javaComponent = javaComponentForMajor(requiredMajor);
+
+    // 1) Подходящая Java уже установлена в системе?
+    QString javaPath = pickCompatibleInstalledJava(
+        installedJavas, requiredMajor, settingsWindow->javaPath());
+
+    if (!javaPath.isEmpty())
+    {
+        launchGame(root, gameDir, version, versionDir, mainClass, javaPath, requiredMajor);
+        return;
+    }
+
+    // 2) Уже скачивали Java от Mojang для этого компонента?
+    QString runtimeDir = gameDir + "/runtime/" + javaComponent;
+#if defined(Q_OS_WIN)
+    QString runtimeExe = runtimeDir + "/bin/javaw.exe";
+#elif defined(Q_OS_MAC)
+    QString runtimeExe = runtimeDir + "/jre.bundle/Contents/Home/bin/java";
+#else
+    QString runtimeExe = runtimeDir + "/bin/java";
+#endif
+    if (QFileInfo::exists(runtimeExe))
+    {
+        installedJavas[requiredMajor] = runtimeExe;
+        launchGame(root, gameDir, version, versionDir, mainClass, runtimeExe, requiredMajor);
+        return;
+    }
+
+    // 3) Качаем официальную Java от Mojang и запускаем после загрузки.
+    progressBar->setValue(0);
+    progressBar->show();
+    QMessageBox::information(this, "Java",
+        "Для версии " + version + " нужна Java " + QString::number(requiredMajor) +
+        ".\nСкачиваю официальную Java от Mojang — это разовая операция, "
+        "дождитесь завершения загрузки.");
+
+    auto conn = std::make_shared<QMetaObject::Connection>();
+    *conn = connect(downloader, &MinecraftDownloader::javaRuntimeReady, this,
+        [this, root, gameDir, version, versionDir, mainClass, requiredMajor, conn]
+        (const QString& javaExe)
+        {
+            disconnect(*conn);
+            progressBar->hide();
+            installedJavas[requiredMajor] = javaExe;
+            launchGame(root, gameDir, version, versionDir, mainClass, javaExe, requiredMajor);
+        });
+
+    downloader->downloadJavaRuntime(javaComponent, runtimeDir);
+}
+
+// ==================== Launch ====================
+
+void MainWindow::launchGame(const QJsonObject& root,
+                            const QString& gameDir,
+                            const QString& version,
+                            const QString& versionDir,
+                            const QString& mainClass,
+                            const QString& javaPath,
+                            int neededJava)
+{
     int selectedMajor = getJavaMajorVersion(javaPath);
 
-    qDebug() << "MC" << version << "needs Java" << neededJava
-             << "-> using Java" << selectedMajor << "at" << javaPath;
+    qDebug() << "MC" << version << "launching with Java" << selectedMajor
+             << "at" << javaPath << "(needs" << neededJava << ")";
 
     // ── Classpath ──────────────────────────────────────────────────────────
 
