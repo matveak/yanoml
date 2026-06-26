@@ -18,6 +18,7 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QTextCursor>
+#include <algorithm>
 
 // ==================== Java Auto-Detection ====================
 
@@ -733,11 +734,34 @@ void MainWindow::onForgeVersionsReceived(const QJsonObject& json)
         VersionBox->addItem("Forge " + v);
 }
 
+// Преобразует версию NeoForge из Maven в версию Minecraft.
+// Новая схема (1.20.2+): MAJOR.MINOR.PATCH -> 1.MAJOR.MINOR (при MINOR == 0 это
+// 1.MAJOR, напр. 21.0.x -> 1.21). Версии вида 47.x.x — это NeoForge для 1.20.1
+// (ответвление от Forge 47).
+static QString neoForgeToMcVersion(const QString& neoVersion)
+{
+    if (neoVersion.startsWith("47."))
+        return "1.20.1";
+
+    const QStringList parts = neoVersion.split('.');
+    if (parts.size() >= 2)
+    {
+        bool okMajor = false, okMinor = false;
+        const int major = parts[0].toInt(&okMajor);
+        const int minor = parts[1].section('-', 0, 0).toInt(&okMinor);
+        if (okMajor && okMinor)
+            return minor == 0 ? QString("1.%1").arg(major)
+                              : QString("1.%1.%2").arg(major).arg(minor);
+    }
+    return neoVersion;
+}
+
 void MainWindow::onNeoForgeVersionReceived(const QString& xml)
 {
     VersionBox->clear();
     QStringList lines = xml.split('\n');
     QSet<QString> added;
+    QStringList mcVersions;
 
     for (const QString& line : lines)
     {
@@ -754,15 +778,22 @@ void MainWindow::onNeoForgeVersionReceived(const QString& xml)
             && !settingsWindow->showSnapshots())
             continue;
 
-        QString mcVersion = version;
-        if (mcVersion.startsWith("21.")) mcVersion = "1." + mcVersion;
+        const QString mcVersion = neoForgeToMcVersion(version);
 
         if (!added.contains(mcVersion))
         {
             added.insert(mcVersion);
-            VersionBox->addItem(mcVersion);
+            mcVersions << mcVersion;
         }
     }
+
+    std::sort(mcVersions.begin(), mcVersions.end(),
+              [](const QString& a, const QString& b) {
+                  return QVersionNumber::fromString(a) > QVersionNumber::fromString(b);
+              });
+
+    for (const QString& v : mcVersions)
+        VersionBox->addItem(v);
 }
 
 void MainWindow::loadVersions()
