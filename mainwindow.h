@@ -68,4 +68,13 @@ private:
     void setupTrayIcon();
     void loadVersions();
     void showCrashDialog(int neededJava, const QString& javaPath);
+
+    // Сборка classpath/аргументов и фактический запуск процесса Minecraft.
+    void launchGame(const QJsonObject& root,
+                    const QString& gameDir,
+                    const QString& version,
+                    const QString& versionDir,
+                    const QString& mainClass,
+                    const QString& javaPath,
+                    int neededJava);
 };

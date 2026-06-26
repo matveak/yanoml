@@ -19,6 +19,8 @@
 #include <QClipboard>
 #include <QTextCursor>
 #include <algorithm>
+#include <memory>
+#include <private/qzipreader_p.h>
 
 // ==================== Java Auto-Detection ====================
 
@@ -124,53 +126,204 @@ static QMap<int, QString> findInstalledJavas()
     return found;
 }
 
-// Выбирает лучший подходящий путь к Java для данной версии MC
-// Приоритет: минимальная подходящая версия (не берём 21 там, где хватит 8)
-static QString selectJavaForVersion(const QString& mcVersion,
-                                    const QMap<int, QString>& javas,
-                                    const QString& userJavaPath)
+// Совместима ли установленная Java с версией, которую требует Minecraft.
+// Старые версии (LWJGL 3.2.x и раньше) падают на слишком новой Java,
+// поэтому им нужна именно major-версия, указанная Mojang.
+// Современные (Java 17+, LWJGL 3.3+) спокойно работают на более новой Java.
+static bool javaIsCompatible(int installedMajor, int requiredMajor)
 {
-    int needed = requiredJavaMajor(mcVersion);
+    if (installedMajor <= 0)
+        return false;
+    if (installedMajor == requiredMajor)
+        return true;
+    if (requiredMajor >= 17)
+        return installedMajor >= requiredMajor;
+    return false;
+}
 
-    // Сначала проверяем путь пользователя из настроек
+// Ищет среди установленных Java ту, что совместима с требуемой major-версией.
+// Возвращает пустую строку, если подходящей нет (тогда качаем Java от Mojang).
+static QString pickCompatibleInstalledJava(const QMap<int, QString>& javas,
+                                           int requiredMajor,
+                                           const QString& userJavaPath)
+{
     if (!userJavaPath.isEmpty() && QFileInfo::exists(userJavaPath))
     {
         int userMajor = getJavaMajorVersion(userJavaPath);
-        if (userMajor >= needed)
-        {
-            qDebug() << "Using user-specified Java" << userMajor << "for MC" << mcVersion;
+        if (javaIsCompatible(userMajor, requiredMajor))
             return userJavaPath;
-        }
-        qDebug() << "User Java" << userMajor << "too old for MC" << mcVersion
-                 << "(need" << needed << "), searching for better...";
     }
 
-    // Ищем минимальную подходящую версию из найденных
+    if (javas.contains(requiredMajor))
+        return javas[requiredMajor];
+
     QString best;
     int bestMajor = INT_MAX;
-
     for (auto it = javas.constBegin(); it != javas.constEnd(); ++it)
     {
-        int major = it.key();
-        if (major >= needed && major < bestMajor)
+        if (javaIsCompatible(it.key(), requiredMajor) && it.key() < bestMajor)
         {
-            bestMajor = major;
+            bestMajor = it.key();
             best = it.value();
         }
     }
+    return best;
+}
 
-    if (!best.isEmpty())
+// По требуемой major-версии возвращает имя Java-компонента Mojang
+// (используется, если в version.json нет поля javaVersion.component).
+static QString javaComponentForMajor(int requiredMajor)
+{
+    if (requiredMajor <= 8)  return "jre-legacy";
+    if (requiredMajor <= 16) return "java-runtime-alpha";
+    if (requiredMajor <= 17) return "java-runtime-gamma";
+    return "java-runtime-delta";
+}
+
+// ==================== Natives Extraction ====================
+
+// Проверяет правила библиотеки для текущей ОС (allow/disallow).
+static bool nativeLibraryAllowedOnCurrentOS(const QJsonObject& lib)
+{
+    QJsonArray rules = lib["rules"].toArray();
+    if (rules.isEmpty())
+        return true;
+
+    bool allowed = false;
+
+    for (const auto& rv : rules)
     {
-        qDebug() << "Auto-selected Java" << bestMajor << "for MC" << mcVersion;
-        return best;
+        QJsonObject rule = rv.toObject();
+        QString action   = rule["action"].toString();
+
+        if (rule.contains("os"))
+        {
+            QString osName = rule["os"].toObject()["name"].toString();
+#ifdef Q_OS_WIN
+            QString cur = "windows";
+#elif defined(Q_OS_MAC)
+            QString cur = "osx";
+#else
+            QString cur = "linux";
+#endif
+            if (osName == cur) allowed = (action == "allow");
+        }
+        else
+        {
+            allowed = (action == "allow");
+        }
     }
 
-    // Ничего не нашли — возвращаем системную java и надеемся на лучшее
+    return allowed;
+}
+
+// Распаковывает нативные библиотеки (LWJGL .dll/.so/.dylib) из скачанных
+// classifier-джарников в каталог natives. Без этого шага старые версии
+// (до 1.19, использующие classifiers) падают: java.library.path указывает
+// на пустую папку и LWJGL не может загрузить нативные библиотеки.
+static void extractNativesForVersion(const QJsonObject& root,
+                                     const QString& gameDir,
+                                     const QString& nativesDir)
+{
+    QDir().mkpath(nativesDir);
+
+    QJsonArray libraries = root["libraries"].toArray();
+
+    for (const auto& value : libraries)
+    {
+        QJsonObject lib = value.toObject();
+
+        if (!nativeLibraryAllowedOnCurrentOS(lib))
+            continue;
+
+        QJsonObject downloads = lib["downloads"].toObject();
+        if (!downloads.contains("classifiers"))
+            continue;
+
+        QJsonObject classifiers = downloads["classifiers"].toObject();
+
+        // Выбираем classifier для текущей ОС — так же, как при скачивании.
+        QString nativeKey;
 #ifdef Q_OS_WIN
-    return "javaw";
+        if (classifiers.contains("natives-windows"))
+            nativeKey = "natives-windows";
+        else if (classifiers.contains("natives-windows-64"))
+            nativeKey = "natives-windows-64";
+#elif defined(Q_OS_MAC)
+        if (classifiers.contains("natives-osx"))
+            nativeKey = "natives-osx";
+        else if (classifiers.contains("natives-macos"))
+            nativeKey = "natives-macos";
 #else
-    return "java";
+        if (classifiers.contains("natives-linux"))
+            nativeKey = "natives-linux";
 #endif
+        if (nativeKey.isEmpty())
+            continue;
+
+        QString relPath = classifiers[nativeKey].toObject()["path"].toString();
+        if (relPath.isEmpty())
+            continue;
+
+        QString jarPath = gameDir + "/libraries/" + relPath;
+        if (!QFileInfo::exists(jarPath))
+        {
+            qWarning() << "Native jar not found, skipping:" << jarPath;
+            continue;
+        }
+
+        // Список исключений из version.json (обычно META-INF/).
+        QStringList excludes;
+        QJsonArray excludeArr =
+            lib["extract"].toObject()["exclude"].toArray();
+        for (const auto& ev : excludeArr)
+            excludes << ev.toString();
+        if (excludes.isEmpty())
+            excludes << "META-INF/";
+
+        QZipReader zip(jarPath);
+        if (!zip.isReadable())
+        {
+            qWarning() << "Cannot read native jar:" << jarPath;
+            continue;
+        }
+
+        const auto entries = zip.fileInfoList();
+        for (const auto& entry : entries)
+        {
+            if (!entry.isFile)
+                continue;
+
+            bool excluded = false;
+            for (const QString& ex : excludes)
+            {
+                if (entry.filePath.startsWith(ex))
+                {
+                    excluded = true;
+                    break;
+                }
+            }
+            if (excluded)
+                continue;
+
+            // Раскладываем только сами библиотеки в плоскую папку natives.
+            QString outName = QFileInfo(entry.filePath).fileName();
+            if (outName.isEmpty())
+                continue;
+
+            QString outPath = nativesDir + "/" + outName;
+            QFile out(outPath);
+            if (out.open(QIODevice::WriteOnly))
+            {
+                out.write(zip.fileData(entry.filePath));
+                out.close();
+            }
+            else
+            {
+                qWarning() << "Cannot write native:" << outPath;
+            }
+        }
+    }
 }
 
 // ==================== MainWindow ====================
@@ -264,6 +417,13 @@ void MainWindow::setupConnections()
                 progressBar->show();
                 progressBar->setValue(percent);
             });
+
+    connect(downloader, &MinecraftDownloader::javaRuntimeProgress, this,
+            [this](int percent)
+            {
+                progressBar->show();
+                progressBar->setValue(percent);
+            });
 }
 
 // ==================== Installer ====================
@@ -336,18 +496,79 @@ void MainWindow::on_PlayButton_clicked()
         return;
     }
 
-    // ── Java: автовыбор ────────────────────────────────────────────────────
+    // ── Java: автовыбор / авто-скачивание ──────────────────────────────────
 
-    QString javaPath = selectJavaForVersion(
-        version,
-        installedJavas,
-        settingsWindow->javaPath());
+    QJsonObject javaVer = root["javaVersion"].toObject();
+    int requiredMajor = javaVer["majorVersion"].toInt();
+    if (requiredMajor <= 0)
+        requiredMajor = requiredJavaMajor(version);
 
-    int neededJava  = requiredJavaMajor(version);
+    QString javaComponent = javaVer["component"].toString();
+    if (javaComponent.isEmpty())
+        javaComponent = javaComponentForMajor(requiredMajor);
+
+    // 1) Подходящая Java уже установлена в системе?
+    QString javaPath = pickCompatibleInstalledJava(
+        installedJavas, requiredMajor, settingsWindow->javaPath());
+
+    if (!javaPath.isEmpty())
+    {
+        launchGame(root, gameDir, version, versionDir, mainClass, javaPath, requiredMajor);
+        return;
+    }
+
+    // 2) Уже скачивали Java от Mojang для этого компонента?
+    QString runtimeDir = gameDir + "/runtime/" + javaComponent;
+#if defined(Q_OS_WIN)
+    QString runtimeExe = runtimeDir + "/bin/javaw.exe";
+#elif defined(Q_OS_MAC)
+    QString runtimeExe = runtimeDir + "/jre.bundle/Contents/Home/bin/java";
+#else
+    QString runtimeExe = runtimeDir + "/bin/java";
+#endif
+    if (QFileInfo::exists(runtimeExe))
+    {
+        installedJavas[requiredMajor] = runtimeExe;
+        launchGame(root, gameDir, version, versionDir, mainClass, runtimeExe, requiredMajor);
+        return;
+    }
+
+    // 3) Качаем официальную Java от Mojang и запускаем после загрузки.
+    progressBar->setValue(0);
+    progressBar->show();
+    QMessageBox::information(this, "Java",
+        "Для версии " + version + " нужна Java " + QString::number(requiredMajor) +
+        ".\nСкачиваю официальную Java от Mojang — это разовая операция, "
+        "дождитесь завершения загрузки.");
+
+    auto conn = std::make_shared<QMetaObject::Connection>();
+    *conn = connect(downloader, &MinecraftDownloader::javaRuntimeReady, this,
+        [this, root, gameDir, version, versionDir, mainClass, requiredMajor, conn]
+        (const QString& javaExe)
+        {
+            disconnect(*conn);
+            progressBar->hide();
+            installedJavas[requiredMajor] = javaExe;
+            launchGame(root, gameDir, version, versionDir, mainClass, javaExe, requiredMajor);
+        });
+
+    downloader->downloadJavaRuntime(javaComponent, runtimeDir);
+}
+
+// ==================== Launch ====================
+
+void MainWindow::launchGame(const QJsonObject& root,
+                            const QString& gameDir,
+                            const QString& version,
+                            const QString& versionDir,
+                            const QString& mainClass,
+                            const QString& javaPath,
+                            int neededJava)
+{
     int selectedMajor = getJavaMajorVersion(javaPath);
 
-    qDebug() << "MC" << version << "needs Java" << neededJava
-             << "-> using Java" << selectedMajor << "at" << javaPath;
+    qDebug() << "MC" << version << "launching with Java" << selectedMajor
+             << "at" << javaPath << "(needs" << neededJava << ")";
 
     // ── Classpath ──────────────────────────────────────────────────────────
 
@@ -410,6 +631,11 @@ void MainWindow::on_PlayButton_clicked()
 
     if (!classPath.isEmpty()) classPath += sep;
     classPath += versionDir + "/" + version + ".jar";
+
+    // ── Natives ──────────────────────────────────────────────────────────────
+    // Распаковываем нативные библиотеки в versions/<id>/natives.
+    // Без этого старые версии (использующие classifiers) падают при запуске.
+    extractNativesForVersion(root, gameDir, versionDir + "/natives");
 
     // ── RAM ────────────────────────────────────────────────────────────────
 

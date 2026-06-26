@@ -4,6 +4,7 @@
 #include <QDebug>
 #include <QDir>
 #include <QFileInfo>
+#include <QCryptographicHash>
 
 MinecraftDownloader::MinecraftDownloader(QObject* parent)
     : QObject(parent)
@@ -547,6 +548,7 @@ void MinecraftDownloader::createInstance(
                                         for (auto it = objects.begin(); it != objects.end(); ++it)
                                         {
                                             QString hash   = it.value().toObject()["hash"].toString();
+                                            int     expSize = it.value().toObject()["size"].toInt();
                                             QString subdir = hash.left(2);
 
                                             QString objectUrl =
@@ -558,54 +560,303 @@ void MinecraftDownloader::createInstance(
 
                                             QDir().mkpath(QFileInfo(objectPath).path());
 
-                                            // Skip already-cached assets
+                                            // Используем кэш только если файл цел (совпадает размер).
+                                            // Битые/обрезанные объекты (например иконка окна)
+                                            // перекачиваются заново — иначе краш "Could not load icon".
                                             if (QFileInfo::exists(objectPath))
                                             {
-                                                ++(*downloaded);
-                                                emit totalProgress((*downloaded * 100) / total);
-                                                if (*downloaded >= total)
+                                                if (expSize <= 0 ||
+                                                    QFileInfo(objectPath).size() == expSize)
                                                 {
-                                                    emit instanceCreated(instancePath);
-                                                    delete downloaded;
+                                                    markAssetDone(downloaded, total, instancePath);
+                                                    continue;
                                                 }
-                                                continue;
+
+                                                QFile::remove(objectPath);
                                             }
 
-                                            QNetworkReply* objReply =
-                                                manager.get(QNetworkRequest(QUrl(objectUrl)));
-
-                                            QFile* file = new QFile(objectPath);
-                                            file->open(QIODevice::WriteOnly);
-
-                                            connect(objReply, &QNetworkReply::readyRead, this,
-                                                    [objReply, file]()
-                                                    {
-                                                        file->write(objReply->readAll());
-                                                    });
-
-                                            connect(objReply, &QNetworkReply::finished, this,
-                                                    [=]() mutable
-                                                    {
-                                                        // Flush any final bytes
-                                                        QByteArray tail = objReply->readAll();
-                                                        if (!tail.isEmpty())
-                                                            file->write(tail);
-
-                                                        file->close();
-                                                        file->deleteLater();
-                                                        objReply->deleteLater();
-
-                                                        ++(*downloaded);
-                                                        emit totalProgress((*downloaded * 100) / total);
-
-                                                        if (*downloaded >= total)
-                                                        {
-                                                            emit instanceCreated(instancePath);
-                                                            delete downloaded;
-                                                        }
-                                                    });
+                                            downloadAssetObject(QUrl(objectUrl), objectPath, hash,
+                                                                downloaded, total, instancePath, 0);
                                         }
                                     });
+                        });
+            });
+}
+
+// ==================== ASSET OBJECT ====================
+
+void MinecraftDownloader::markAssetDone(int* downloaded, int total,
+                                        const QString& instancePath)
+{
+    ++(*downloaded);
+    emit totalProgress((*downloaded * 100) / total);
+
+    if (*downloaded >= total)
+    {
+        emit instanceCreated(instancePath);
+        delete downloaded;
+    }
+}
+
+void MinecraftDownloader::downloadAssetObject(const QUrl& url,
+                                              const QString& outputPath,
+                                              const QString& expectedHash,
+                                              int* downloaded,
+                                              int total,
+                                              const QString& instancePath,
+                                              int attempt)
+{
+    QNetworkReply*      reply = manager.get(QNetworkRequest(url));
+    QSaveFile*          file  = new QSaveFile(outputPath);
+    QCryptographicHash* sha1  = new QCryptographicHash(QCryptographicHash::Sha1);
+
+    if (!file->open(QIODevice::WriteOnly))
+    {
+        delete sha1;
+        file->deleteLater();
+        reply->deleteLater();
+        emit errorOccurred("Не удалось открыть файл для записи: " + outputPath);
+        markAssetDone(downloaded, total, instancePath);
+        return;
+    }
+
+    connect(reply, &QNetworkReply::readyRead, this, [reply, file, sha1]()
+            {
+                QByteArray chunk = reply->readAll();
+                file->write(chunk);
+                sha1->addData(chunk);
+            });
+
+    connect(reply, &QNetworkReply::finished, this,
+            [this, reply, file, sha1, url, outputPath, expectedHash,
+             downloaded, total, instancePath, attempt]()
+            {
+                QByteArray tail = reply->readAll();
+                if (!tail.isEmpty())
+                {
+                    file->write(tail);
+                    sha1->addData(tail);
+                }
+
+                bool    netOk   = (reply->error() == QNetworkReply::NoError);
+                QString gotHash = QString::fromLatin1(sha1->result().toHex());
+                bool    hashOk  = expectedHash.isEmpty() || (gotHash == expectedHash);
+
+                delete sha1;
+                reply->deleteLater();
+
+                if (netOk && hashOk)
+                {
+                    file->commit();
+                    file->deleteLater();
+                    markAssetDone(downloaded, total, instancePath);
+                    return;
+                }
+
+                // Не оставляем битый файл на диске.
+                file->cancelWriting();
+                file->deleteLater();
+
+                if (attempt < 2)
+                {
+                    downloadAssetObject(url, outputPath, expectedHash,
+                                        downloaded, total, instancePath, attempt + 1);
+                    return;
+                }
+
+                emit errorOccurred("Не удалось скачать ассет (битый файл): " + outputPath);
+                markAssetDone(downloaded, total, instancePath);
+            });
+}
+
+// ==================== JAVA RUNTIME ====================
+
+void MinecraftDownloader::downloadJavaRuntime(const QString& component,
+                                              const QString& outputDir)
+{
+#if defined(Q_OS_WIN)
+#  if defined(Q_PROCESSOR_ARM)
+    const QString platformKey = "windows-arm64";
+#  else
+    const QString platformKey = "windows-x64";
+#  endif
+#elif defined(Q_OS_MAC)
+#  if defined(Q_PROCESSOR_ARM)
+    const QString platformKey = "mac-os-arm64";
+#  else
+    const QString platformKey = "mac-os";
+#  endif
+#else
+#  if defined(Q_PROCESSOR_X86_32)
+    const QString platformKey = "linux-i386";
+#  else
+    const QString platformKey = "linux";
+#  endif
+#endif
+
+    QDir().mkpath(outputDir);
+
+    // Список всех доступных Java runtime от Mojang.
+    const QString allUrl =
+        "https://launchermeta.mojang.com/v1/products/java-runtime/"
+        "2ec0cc96c44e5a76b9c8b7c39df7210883d12871/all.json";
+
+    QNetworkReply* allReply = manager.get(QNetworkRequest(QUrl(allUrl)));
+
+    connect(allReply, &QNetworkReply::finished, this,
+            [this, allReply, platformKey, component, outputDir]()
+            {
+                allReply->deleteLater();
+
+                if (allReply->error() != QNetworkReply::NoError)
+                {
+                    emit errorOccurred(allReply->errorString());
+                    return;
+                }
+
+                QJsonObject root =
+                    QJsonDocument::fromJson(allReply->readAll()).object();
+
+                QJsonArray comps =
+                    root[platformKey].toObject()[component].toArray();
+
+                if (comps.isEmpty())
+                {
+                    emit errorOccurred("Java runtime не найдена: " +
+                                       platformKey + "/" + component);
+                    return;
+                }
+
+                QString manifestUrl = comps[0].toObject()["manifest"]
+                                          .toObject()["url"].toString();
+
+                if (manifestUrl.isEmpty())
+                {
+                    emit errorOccurred("Нет ссылки на manifest Java runtime");
+                    return;
+                }
+
+                // ── Manifest со списком файлов runtime ───────────────────────
+                QNetworkReply* manReply =
+                    manager.get(QNetworkRequest(QUrl(manifestUrl)));
+
+                connect(manReply, &QNetworkReply::finished, this,
+                        [this, manReply, outputDir]()
+                        {
+                            manReply->deleteLater();
+
+                            if (manReply->error() != QNetworkReply::NoError)
+                            {
+                                emit errorOccurred(manReply->errorString());
+                                return;
+                            }
+
+                            QJsonObject files =
+                                QJsonDocument::fromJson(manReply->readAll())
+                                    .object()["files"].toObject();
+
+                            struct DlItem { QString url; QString path; bool executable; };
+                            QVector<DlItem> items;
+                            QString javaExe;
+
+                            for (auto it = files.begin(); it != files.end(); ++it)
+                            {
+                                const QString rel  = it.key();
+                                QJsonObject entry  = it.value().toObject();
+                                const QString type = entry["type"].toString();
+                                const QString outPath = outputDir + "/" + rel;
+
+                                if (type == "directory")
+                                {
+                                    QDir().mkpath(outPath);
+                                    continue;
+                                }
+                                if (type != "file")
+                                    continue; // symlink — пропускаем
+
+                                QDir().mkpath(QFileInfo(outPath).path());
+
+                                const bool exe = entry["executable"].toBool();
+
+                                if (rel.endsWith("bin/javaw.exe") ||
+                                    (javaExe.isEmpty() && rel.endsWith("bin/java")))
+                                    javaExe = outPath;
+
+                                QString rawUrl = entry["downloads"].toObject()["raw"]
+                                                     .toObject()["url"].toString();
+                                if (rawUrl.isEmpty())
+                                    continue;
+
+                                items.push_back({ rawUrl, outPath, exe });
+                            }
+
+                            if (items.isEmpty())
+                            {
+                                emit errorOccurred("Manifest Java runtime пуст");
+                                return;
+                            }
+                            if (javaExe.isEmpty())
+                                javaExe = outputDir + "/bin/javaw.exe";
+
+                            const int total = items.size();
+                            int* done = new int(0);
+
+                            auto finishOne = [this, total, done, javaExe]()
+                            {
+                                ++(*done);
+                                emit javaRuntimeProgress((*done * 100) / total);
+                                if (*done >= total)
+                                {
+                                    emit javaRuntimeReady(javaExe);
+                                    delete done;
+                                }
+                            };
+
+                            for (const DlItem& item : items)
+                            {
+                                if (QFileInfo::exists(item.path))
+                                {
+                                    finishOne();
+                                    continue;
+                                }
+
+                                QNetworkReply* fileReply =
+                                    manager.get(QNetworkRequest(QUrl(item.url)));
+                                QFile* f = new QFile(item.path);
+
+                                if (!f->open(QIODevice::WriteOnly))
+                                {
+                                    f->deleteLater();
+                                    fileReply->deleteLater();
+                                    finishOne();
+                                    continue;
+                                }
+
+                                connect(fileReply, &QNetworkReply::readyRead, this,
+                                        [fileReply, f]()
+                                        {
+                                            f->write(fileReply->readAll());
+                                        });
+
+                                connect(fileReply, &QNetworkReply::finished, this,
+                                        [=]()
+                                        {
+                                            QByteArray tail = fileReply->readAll();
+                                            if (!tail.isEmpty())
+                                                f->write(tail);
+                                            f->close();
+
+                                            if (item.executable)
+                                                f->setPermissions(f->permissions()
+                                                    | QFileDevice::ExeOwner
+                                                    | QFileDevice::ExeGroup
+                                                    | QFileDevice::ExeOther);
+
+                                            f->deleteLater();
+                                            fileReply->deleteLater();
+                                            finishOne();
+                                        });
+                            }
                         });
             });
 }

@@ -35,6 +35,10 @@ public:
     void downloadVanillaVersion(const QString& versionJsonUrl, const QString& outputJarPath);
     void createInstance(const QString& minecraftVersion, const QString& modLoader, const QString& modLoaderVersion, const QString& instancePath);
 
+    // Скачивает официальную Java от Mojang (component, например "jre-legacy").
+    // По завершении испускает javaRuntimeReady с путём к java/javaw.
+    void downloadJavaRuntime(const QString& component, const QString& outputDir);
+
 
 signals:
     void vanillaVersionsReceived(const QVector<MinecraftVersion>& versions);
@@ -46,6 +50,8 @@ signals:
     void downloadProgress(qint64 bytesReceived, qint64 bytesTotal);
     void errorOccurred(const QString& errorString);
     void instanceCreated(QString path);
+    void javaRuntimeProgress(int percent);
+    void javaRuntimeReady(const QString& javaExecutable);
 private:
     QNetworkAccessManager manager;
     int totalFiles = 0;
@@ -54,4 +60,18 @@ private:
     void handleFabricManifest(QNetworkReply* reply);
     void handleForgeManifest(QNetworkReply* reply);
     void handleNeoForgeManifest(QNetworkReply* reply);
+
+    // Скачивает один asset-объект с атомарной записью и проверкой SHA1.
+    // При сбое/несовпадении хэша повторяет загрузку (до 3 попыток).
+    void downloadAssetObject(const QUrl& url,
+                             const QString& outputPath,
+                             const QString& expectedHash,
+                             int* downloaded,
+                             int total,
+                             const QString& instancePath,
+                             int attempt);
+
+    // Отмечает завершение одного ассета, двигает прогресс и испускает
+    // instanceCreated, когда скачаны все объекты.
+    void markAssetDone(int* downloaded, int total, const QString& instancePath);
 };
