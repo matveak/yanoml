@@ -162,6 +162,16 @@ void ModrithAPI::getMods(QString query,
             });
 }
 
+// Минимальная версия Minecraft, начиная с которой существует загрузчик.
+// Null (по умолчанию) — без ограничения.
+static QVersionNumber loaderMinVersion(const QString& loader)
+{
+    if (loader == "neoforge") return QVersionNumber::fromString("1.20.1");
+    if (loader == "quilt")    return QVersionNumber::fromString("1.18.2");
+    if (loader == "fabric")   return QVersionNumber::fromString("1.14");
+    return QVersionNumber();
+}
+
 // ===================== FETCH VERSIONS (FROM TAG ENDPOINT) =====================
 void ModrithAPI::fetchAvailableVersions(const QString& loader)
 {
@@ -193,7 +203,13 @@ void ModrithAPI::fetchAvailableVersions(const QString& loader)
                         
                         // Регулярное выражение для Minecraft версий (1.XX, 1.XX.X и т.д.)
                         QRegularExpression mcVersionRegex("^1\\.(\\d+)(\\.(\\d+))?$");
-                        
+
+                        // Минимальная версия Minecraft, поддерживаемая загрузчиком.
+                        // /tag/game_version отдаёт ВСЕ версии MC, без привязки к загрузчику,
+                        // поэтому отсекаем те, где загрузчика ещё не существовало
+                        // (NeoForge появился только с 1.20.1, Fabric — с 1.14, Quilt — с 1.18.2).
+                        const QVersionNumber minVer = loaderMinVersion(loader);
+
                         int validVersions = 0;
 
                         // Собираем только версии Minecraft (формата 1.XX.X)
@@ -205,6 +221,10 @@ void ModrithAPI::fetchAvailableVersions(const QString& loader)
                             // Проверяем, что это версия Minecraft (начинается с "1.")
                             if (mcVersionRegex.match(version).hasMatch())
                             {
+                                if (!minVer.isNull()
+                                    && QVersionNumber::fromString(version) < minVer)
+                                    continue;
+
                                 versionsSet.insert(version);
                                 validVersions++;
                                 
