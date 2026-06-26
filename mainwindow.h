@@ -1,27 +1,30 @@
+#pragma once
+#define MAINWINDOW_H
 
-#include <QCheckBox>
-#include "ui_MainWindow.h"
-#include "modwindow.h"
-#include "MinecraftDownloader.h"
 #include <QMainWindow>
-#include "moddetailwindow.h"
-#include "settingswindow.h"
-//#include <QOAuth2AuthorizationCodeFlow>
-//#include <QOAuthHttpServerReplyHandler>
+#include <QComboBox>
+#include <QCheckBox>
+#include <QProgressBar>
+#include <QSystemTrayIcon>
+#include <QProcess>
 #include <QNetworkAccessManager>
 #include <QDesktopServices>
 #include <QUrl>
-#include <QProgressBar>
-#define MAINWINDOW_H
-#include <QCheckBox>
+#include <QMap>
+#include <QTimer>
+#include <QCryptographicHash>
+#include <QRegularExpression>
+#include <QDialog>
+#include <QTextEdit>
+
 #include "ui_MainWindow.h"
 #include "modwindow.h"
 #include "MinecraftDownloader.h"
-#include <QMainWindow>
-#include <QSystemTrayIcon>
-#include <QProcess>
+#include "moddetailwindow.h"
+#include "settingswindow.h"
 
-class MainWindow : public QMainWindow, private Ui::MainWindow {
+class MainWindow : public QMainWindow, private Ui::MainWindow
+{
     Q_OBJECT
 
 public:
@@ -44,18 +47,25 @@ private slots:
     void on_PickAccountButton_clicked();
     void on_InstallerButton_clicked();
 
-    void onMinecraftFinished(int exitCode, QProcess::ExitStatus exitStatus); // ← Новый слот
+    void onMinecraftFinished(int exitCode, QProcess::ExitStatus exitStatus);
 
 private:
-    QProgressBar* progressBar = nullptr;
-    QSystemTrayIcon* trayIcon = nullptr;        // ← Новый
-    QProcess* minecraftProcess = nullptr;       // ← Новый
+    QProgressBar*        progressBar      = nullptr;
+    QSystemTrayIcon*     trayIcon         = nullptr;
+    QProcess*            minecraftProcess = nullptr;
 
-    SettingsWindow* settingsWindow = nullptr;
-    MinecraftDownloader* downloader = nullptr;
-    QComboBox* LoaderBox = nullptr;
+    SettingsWindow*      settingsWindow   = nullptr;
+    MinecraftDownloader* downloader       = nullptr;
+    QComboBox*           LoaderBox        = nullptr;
+
+    // Кэш найденных Java: major версия -> путь к исполняемому файлу
+    QMap<int, QString>   installedJavas;
+
+    // Накопленный вывод процесса Minecraft для показа при крэше
+    QString              crashLog;
 
     void setupConnections();
-    void setupTrayIcon();                       // ← Новый метод
+    void setupTrayIcon();
     void loadVersions();
+    void showCrashDialog(int neededJava, const QString& javaPath);
 };
