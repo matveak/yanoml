@@ -14,6 +14,15 @@
 #include <QPixmap>
 #include <QDebug>
 
+namespace {
+const char* kBg      = "#16181C";
+const char* kPanel   = "#26292F";
+const char* kBorder  = "#3A3E45";
+const char* kText    = "#E8EAED";
+const char* kTextDim = "#9CA3AF";
+const char* kAccent  = "#1BD96A";
+} // namespace
+
 ModDetailsWindow::ModDetailsWindow(
     const Mod& mod,
     QWidget* parent)
@@ -23,12 +32,19 @@ ModDetailsWindow::ModDetailsWindow(
     resize(1000, 750);
 
     setWindowTitle(mod.name);
+    setStyleSheet(QString(
+        "QDialog { background-color: %1; color: %2; }"
+        "QLabel { color: %2; }"
+        "QScrollArea { border: none; background: transparent; }")
+        .arg(kBg, kText));
 
     api = new ModrithAPI(this);
     manager = new QNetworkAccessManager(this);
 
     QVBoxLayout* mainLayout =
         new QVBoxLayout(this);
+    mainLayout->setContentsMargins(20, 20, 20, 20);
+    mainLayout->setSpacing(14);
 
     // =========================
     // HEADER
@@ -42,39 +58,53 @@ ModDetailsWindow::ModDetailsWindow(
 
     iconLabel->setFixedSize(128, 128);
     iconLabel->setScaledContents(true);
+    iconLabel->setStyleSheet(QString(
+        "border-radius: 12px; border: 1px solid %1; background: %2;")
+        .arg(kBorder, kPanel));
 
     QVBoxLayout* infoLayout =
         new QVBoxLayout();
 
+    infoLayout->setSpacing(6);
+
     titleLabel =
         new QLabel(
             "<h1>" + mod.name + "</h1>");
+    titleLabel->setStyleSheet(QString("font-size: 26px; color: %1;").arg(kText));
 
     authorLabel =
         new QLabel(
             "Автор: " + mod.author);
+    authorLabel->setStyleSheet(QString("color: %1;").arg(kTextDim));
 
     downloadsLabel =
         new QLabel(
-            "Загрузок: " +
+            "⬇ " +
             QString::number(mod.downloads));
+    downloadsLabel->setStyleSheet(QString("color: %1;").arg(kTextDim));
 
     categoriesLabel =
         new QLabel();
+    categoriesLabel->setWordWrap(true);
+    categoriesLabel->setStyleSheet(QString("color: %1;").arg(kTextDim));
 
     versionsLabel =
         new QLabel(
             "Версии: " +
             mod.versions.join(", "));
+    versionsLabel->setWordWrap(true);
+    versionsLabel->setStyleSheet(QString("color: %1;").arg(kTextDim));
 
     infoLayout->addWidget(titleLabel);
     infoLayout->addWidget(authorLabel);
     infoLayout->addWidget(downloadsLabel);
     infoLayout->addWidget(categoriesLabel);
     infoLayout->addWidget(versionsLabel);
+    infoLayout->addStretch(1);
 
-    headerLayout->addWidget(iconLabel);
-    headerLayout->addLayout(infoLayout);
+    headerLayout->addWidget(iconLabel, 0, Qt::AlignTop);
+    headerLayout->addSpacing(16);
+    headerLayout->addLayout(infoLayout, 1);
 
     // =========================
     // DESCRIPTION
@@ -86,6 +116,10 @@ ModDetailsWindow::ModDetailsWindow(
     descriptionBrowser->setOpenExternalLinks(true);
     descriptionBrowser->setText(
         "Загрузка описания...");
+    descriptionBrowser->setStyleSheet(QString(
+        "QTextBrowser { background-color: %1; border: 1px solid %2;"
+        " border-radius: 10px; padding: 12px; color: %3; }")
+        .arg(kPanel, kBorder, kText));
 
     // =========================
     // GALLERY
@@ -110,8 +144,19 @@ ModDetailsWindow::ModDetailsWindow(
 
     installButton =
         new QPushButton(
-            "Установить мод",
+            "+ Установить мод",
             this);
+    installButton->setFixedHeight(44);
+    installButton->setCursor(Qt::PointingHandCursor);
+    installButton->setStyleSheet(QString(
+        "QPushButton { background-color: %1; color: #0A0A0A; border: none;"
+        " border-radius: 10px; font-weight: bold; font-size: 15px; }"
+        "QPushButton:hover { background-color: #15c25e; }")
+        .arg(kAccent));
+
+    connect(installButton, &QPushButton::clicked, this, [this]() {
+        emit installRequested(currentMod);
+    });
 
     // =========================
     // ADD TO LAYOUT

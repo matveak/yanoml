@@ -19,6 +19,9 @@ public:
         const Mod& mod,
         QWidget* parent = nullptr);
 
+signals:
+    void installRequested(const Mod& mod);
+
 private slots:
     void onProjectReceived(
         const ModProject& project);

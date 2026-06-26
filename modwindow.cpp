@@ -15,7 +15,6 @@
 #include <QComboBox>
 #include <QCheckBox>
 #include <QNetworkReply>
-#include <QDesktopServices>
 #include <QMouseEvent>
 #include <QDateTime>
 #include <QSet>
@@ -200,6 +199,7 @@ ModWindow::ModWindow(QWidget *parent) : QDialog(parent)
     connect(api, &ModrithAPI::CategoriesReceived, this, &ModWindow::onCategoriesReceived);
     connect(api, &ModrithAPI::LoadersReceived, this, &ModWindow::onLoadersReceived);
     connect(api, &ModrithAPI::ModList, this, &ModWindow::addModCards);
+    connect(api, &ModrithAPI::DownloadLinks, this, &ModWindow::onDownloadLinks);
     connect(api, &ModrithAPI::OnError, this, [this](const QString& error){
         QMessageBox::warning(this, "Modrinth", error);
     });
@@ -840,6 +840,7 @@ void ModWindow::applyFilters()
 void ModWindow::addModCards(const QVector<Mod>& mods)
 {
     clearCards();
+    modById.clear();
 
     if (mods.isEmpty()) {
         QLabel* empty = new QLabel("Ничего не найдено для выбранных фильтров");
@@ -962,7 +963,8 @@ void ModWindow::addModCards(const QVector<Mod>& mods)
         cardLayout->addLayout(infoLayout, 1);
         cardLayout->addLayout(rightLayout);
 
-        // Клик по карточке открывает страницу Modrinth
+        // Клик по карточке открывает страницу мода прямо в лаунчере
+        modById.insert(mod.id, mod);
         card->installEventFilter(this);
         card->setProperty("modName", mod.name);
 
@@ -1032,11 +1034,15 @@ bool ModWindow::eventFilter(QObject* obj, QEvent* event)
             // Если клик был не по кнопке "Установить"
             if (!child || !qobject_cast<QPushButton*>(child))
             {
-                QString slug = card->property("modId").toString();
-                if (!slug.isEmpty())
+                const QString id = card->property("modId").toString();
+                if (modById.contains(id))
                 {
-                    QUrl url("https://modrinth.com/mod/" + slug);
-                    QDesktopServices::openUrl(url);
+                    ModDetailsWindow* details =
+                        new ModDetailsWindow(modById.value(id), this);
+                    details->setAttribute(Qt::WA_DeleteOnClose);
+                    connect(details, &ModDetailsWindow::installRequested,
+                            this, &ModWindow::installMod);
+                    details->show();
                 }
             }
         }

@@ -130,6 +130,9 @@ private:
     QString selectedCategory;      // "" = любая
     QString selectedEnvironment;   // "" = любая ("client"/"server")
 
+    // Карточки -> полный Mod (для открытия страницы мода в лаунчере)
+    QHash<QString, Mod> modById;
+
     ModrithAPI* api = nullptr;
     SettingsWindow* settingsWindow = nullptr;
 protected:
