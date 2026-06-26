@@ -3,6 +3,7 @@
 #include <QDialog>
 #include <QVector>
 #include <QUrl>
+#include <QList>
 
 #include "modrinthapi.h"
 
@@ -11,6 +12,7 @@ class QPushButton;
 class QScrollArea;
 class QWidget;
 class QVBoxLayout;
+class QHBoxLayout;
 class QComboBox;
 class SettingsWindow;
 
@@ -36,7 +38,24 @@ private slots:
 private:
     void clearCards();
     void addModCards(const QVector<Mod>& mods);
-    void setupAdvancedFilters();
+
+    // Сайдбар фильтров
+    QWidget* buildSidebar();
+    void buildCategoryList();
+    void selectCategory(const QString& category);
+    void selectEnvironment(const QString& environment);
+
+    // Активные фильтры (чипы)
+    void rebuildActiveFilters();
+    void clearAllFilters();
+
+    // Текущие значения фильтров
+    QString currentVersion() const;
+    QString currentLoader() const;
+
+    // Форматирование
+    static QString formatCount(quint64 value);
+    static QString formatRelativeDate(const QString& iso);
 
     QLineEdit* searchEdit = nullptr;
     QPushButton* searchButton = nullptr;
@@ -45,10 +64,22 @@ private:
     QWidget* cardsWidget = nullptr;
     QVBoxLayout* cardsLayout = nullptr;
 
+    // Строка над карточками
+    QComboBox* sortCombo = nullptr;
+    QComboBox* viewCombo = nullptr;
+    QWidget* chipsBar = nullptr;
+    QHBoxLayout* chipsLayout = nullptr;
+
+    // Сайдбар
     QComboBox* versionFilter = nullptr;
     QComboBox* loaderFilter = nullptr;
-    QComboBox* categoryFilter = nullptr;
-    QComboBox* environmentFilter = nullptr;
+    QVBoxLayout* categoryListLayout = nullptr;
+    QList<QPushButton*> categoryButtons;
+    QPushButton* clientButton = nullptr;
+    QPushButton* serverButton = nullptr;
+
+    QString selectedCategory;      // "" = любая
+    QString selectedEnvironment;   // "" = любая ("client"/"server")
 
     ModrithAPI* api = nullptr;
     SettingsWindow* settingsWindow = nullptr;

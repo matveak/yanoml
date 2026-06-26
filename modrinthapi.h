@@ -45,6 +45,7 @@ struct Mod
     QString description;
     QVector<QString> categories;
     size_t downloads = 0;
+    size_t follows = 0;
     QUrl iconURL;
     QRgb color = 0;
     QString author;

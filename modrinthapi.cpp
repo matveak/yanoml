@@ -125,9 +125,12 @@ void ModrithAPI::getMods(QString query,
                     mod.name        = obj["title"].toString();
                     mod.description = obj["description"].toString();
                     mod.downloads   = static_cast<size_t>(obj["downloads"].toDouble());
+                    mod.follows     = static_cast<size_t>(obj["follows"].toDouble());
                     mod.iconURL     = QUrl(obj["icon_url"].toString());
                     mod.author      = obj["author"].toString();
                     mod.color       = static_cast<QRgb>(obj["color"].toDouble());
+                    mod.dateCreated = obj["date_created"].toString();
+                    mod.dateUpdated = obj["date_modified"].toString();
 
                     QJsonArray cats = obj["categories"].toArray();
                     for (const auto& c : cats)
