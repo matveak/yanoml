@@ -4,6 +4,7 @@
 #include <QDebug>
 #include <QDir>
 #include <QFileInfo>
+#include <QCryptographicHash>
 
 MinecraftDownloader::MinecraftDownloader(QObject* parent)
     : QObject(parent)
@@ -547,6 +548,7 @@ void MinecraftDownloader::createInstance(
                                         for (auto it = objects.begin(); it != objects.end(); ++it)
                                         {
                                             QString hash   = it.value().toObject()["hash"].toString();
+                                            int     expSize = it.value().toObject()["size"].toInt();
                                             QString subdir = hash.left(2);
 
                                             QString objectUrl =
@@ -558,55 +560,112 @@ void MinecraftDownloader::createInstance(
 
                                             QDir().mkpath(QFileInfo(objectPath).path());
 
-                                            // Skip already-cached assets
+                                            // Используем кэш только если файл цел (совпадает размер).
+                                            // Битые/обрезанные объекты (например иконка окна)
+                                            // перекачиваются заново — иначе краш "Could not load icon".
                                             if (QFileInfo::exists(objectPath))
                                             {
-                                                ++(*downloaded);
-                                                emit totalProgress((*downloaded * 100) / total);
-                                                if (*downloaded >= total)
+                                                if (expSize <= 0 ||
+                                                    QFileInfo(objectPath).size() == expSize)
                                                 {
-                                                    emit instanceCreated(instancePath);
-                                                    delete downloaded;
+                                                    markAssetDone(downloaded, total, instancePath);
+                                                    continue;
                                                 }
-                                                continue;
+
+                                                QFile::remove(objectPath);
                                             }
 
-                                            QNetworkReply* objReply =
-                                                manager.get(QNetworkRequest(QUrl(objectUrl)));
-
-                                            QFile* file = new QFile(objectPath);
-                                            file->open(QIODevice::WriteOnly);
-
-                                            connect(objReply, &QNetworkReply::readyRead, this,
-                                                    [objReply, file]()
-                                                    {
-                                                        file->write(objReply->readAll());
-                                                    });
-
-                                            connect(objReply, &QNetworkReply::finished, this,
-                                                    [=]() mutable
-                                                    {
-                                                        // Flush any final bytes
-                                                        QByteArray tail = objReply->readAll();
-                                                        if (!tail.isEmpty())
-                                                            file->write(tail);
-
-                                                        file->close();
-                                                        file->deleteLater();
-                                                        objReply->deleteLater();
-
-                                                        ++(*downloaded);
-                                                        emit totalProgress((*downloaded * 100) / total);
-
-                                                        if (*downloaded >= total)
-                                                        {
-                                                            emit instanceCreated(instancePath);
-                                                            delete downloaded;
-                                                        }
-                                                    });
+                                            downloadAssetObject(QUrl(objectUrl), objectPath, hash,
+                                                                downloaded, total, instancePath, 0);
                                         }
                                     });
                         });
+            });
+}
+
+// ==================== ASSET OBJECT ====================
+
+void MinecraftDownloader::markAssetDone(int* downloaded, int total,
+                                        const QString& instancePath)
+{
+    ++(*downloaded);
+    emit totalProgress((*downloaded * 100) / total);
+
+    if (*downloaded >= total)
+    {
+        emit instanceCreated(instancePath);
+        delete downloaded;
+    }
+}
+
+void MinecraftDownloader::downloadAssetObject(const QUrl& url,
+                                              const QString& outputPath,
+                                              const QString& expectedHash,
+                                              int* downloaded,
+                                              int total,
+                                              const QString& instancePath,
+                                              int attempt)
+{
+    QNetworkReply*      reply = manager.get(QNetworkRequest(url));
+    QSaveFile*          file  = new QSaveFile(outputPath);
+    QCryptographicHash* sha1  = new QCryptographicHash(QCryptographicHash::Sha1);
+
+    if (!file->open(QIODevice::WriteOnly))
+    {
+        delete sha1;
+        file->deleteLater();
+        reply->deleteLater();
+        emit errorOccurred("Не удалось открыть файл для записи: " + outputPath);
+        markAssetDone(downloaded, total, instancePath);
+        return;
+    }
+
+    connect(reply, &QNetworkReply::readyRead, this, [reply, file, sha1]()
+            {
+                QByteArray chunk = reply->readAll();
+                file->write(chunk);
+                sha1->addData(chunk);
+            });
+
+    connect(reply, &QNetworkReply::finished, this,
+            [this, reply, file, sha1, url, outputPath, expectedHash,
+             downloaded, total, instancePath, attempt]()
+            {
+                QByteArray tail = reply->readAll();
+                if (!tail.isEmpty())
+                {
+                    file->write(tail);
+                    sha1->addData(tail);
+                }
+
+                bool    netOk   = (reply->error() == QNetworkReply::NoError);
+                QString gotHash = QString::fromLatin1(sha1->result().toHex());
+                bool    hashOk  = expectedHash.isEmpty() || (gotHash == expectedHash);
+
+                delete sha1;
+                reply->deleteLater();
+
+                if (netOk && hashOk)
+                {
+                    file->commit();
+                    file->deleteLater();
+                    markAssetDone(downloaded, total, instancePath);
+                    return;
+                }
+
+                // Не оставляем битый файл на диске.
+                file->cancelWriting();
+                file->deleteLater();
+
+                if (attempt < 2)
+                {
+                    downloadAssetObject(url, outputPath, expectedHash,
+                                        downloaded, total, instancePath, attempt + 1);
+                    return;
+                }
+
+                emit errorOccurred("Не удалось скачать ассет (битый файл): " + outputPath);
+                markAssetDone(downloaded, total, instancePath);
             });
 }
 

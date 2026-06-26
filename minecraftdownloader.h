@@ -60,4 +60,18 @@ private:
     void handleFabricManifest(QNetworkReply* reply);
     void handleForgeManifest(QNetworkReply* reply);
     void handleNeoForgeManifest(QNetworkReply* reply);
+
+    // Скачивает один asset-объект с атомарной записью и проверкой SHA1.
+    // При сбое/несовпадении хэша повторяет загрузку (до 3 попыток).
+    void downloadAssetObject(const QUrl& url,
+                             const QString& outputPath,
+                             const QString& expectedHash,
+                             int* downloaded,
+                             int total,
+                             const QString& instancePath,
+                             int attempt);
+
+    // Отмечает завершение одного ассета, двигает прогресс и испускает
+    // instanceCreated, когда скачаны все объекты.
+    void markAssetDone(int* downloaded, int total, const QString& instancePath);
 };
