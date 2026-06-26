@@ -4,6 +4,9 @@
 #include <QVector>
 #include <QUrl>
 #include <QList>
+#include <QHash>
+#include <QIcon>
+#include <QStringList>
 
 #include "modrinthapi.h"
 
@@ -11,6 +14,7 @@ class QLineEdit;
 class QPushButton;
 class QScrollArea;
 class QWidget;
+class QLabel;
 class QVBoxLayout;
 class QHBoxLayout;
 class QComboBox;
@@ -42,11 +46,26 @@ private:
     // Сайдбар фильтров
     QWidget* buildSidebar();
     QWidget* makeSection(const QString& title, QWidget* content,
-                         QLabel** summaryOut, bool expanded);
+                         QLabel** summaryOut, QWidget** contentOut, bool expanded);
     void updateSidebarSummaries();
+    void refreshSummaryVisibility();
+
     void buildCategoryList();
+    void rebuildVersionList();
+    void rebuildLoaderList();
+
+    void selectVersion(const QString& version);
+    void selectLoader(const QString& loader);
     void selectCategory(const QString& category);
     void selectEnvironment(const QString& environment);
+
+    void onCategoriesReceived(const QVector<TagInfo>& categories);
+    void onLoadersReceived(const QVector<TagInfo>& loaders);
+    void updateCategoryIcons();
+    void updateLoaderIcons();
+
+    // SVG-иконка из маркапа Modrinth, перекрашенная в нужный цвет
+    static QIcon makeSvgIcon(const QString& svg, const QString& colorHex, int px = 18);
 
     // Активные фильтры (чипы)
     void rebuildActiveFilters();
@@ -73,11 +92,26 @@ private:
     QWidget* chipsBar = nullptr;
     QHBoxLayout* chipsLayout = nullptr;
 
-    // Сайдбар
-    QComboBox* versionFilter = nullptr;
-    QComboBox* loaderFilter = nullptr;
+    // ── Сайдбар: версии ────────────────────────────────────────────────
+    QLineEdit* versionSearch = nullptr;
+    QVBoxLayout* versionListLayout = nullptr;
+    QList<QPushButton*> versionButtons;
+    QStringList allVersions;
+    bool showAllVersions = false;
+    QString selectedVersion;       // "" = любая
+
+    // ── Сайдбар: загрузчики ────────────────────────────────────────────
+    QVBoxLayout* loaderListLayout = nullptr;
+    QList<QPushButton*> loaderButtons;
+    QVector<TagInfo> loaderTags;
+    QHash<QString, QString> loaderIcons;   // слаг -> svg
+    bool showAllLoaders = false;
+    QString selectedLoader;        // "" = любой (нижний регистр)
+
+    // ── Сайдбар: категории/окружение ───────────────────────────────────
     QVBoxLayout* categoryListLayout = nullptr;
     QList<QPushButton*> categoryButtons;
+    QHash<QString, QString> categoryIcons;  // слаг -> svg
     QPushButton* clientButton = nullptr;
     QPushButton* serverButton = nullptr;
 
@@ -86,6 +120,12 @@ private:
     QLabel* loaderSummary = nullptr;
     QLabel* categorySummary = nullptr;
     QLabel* environmentSummary = nullptr;
+
+    // Контент-виджеты секций (для определения свёрнуто/развёрнуто)
+    QWidget* versionContent = nullptr;
+    QWidget* loaderContent = nullptr;
+    QWidget* categoryContent = nullptr;
+    QWidget* environmentContent = nullptr;
 
     QString selectedCategory;      // "" = любая
     QString selectedEnvironment;   // "" = любая ("client"/"server")

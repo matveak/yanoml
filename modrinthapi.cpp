@@ -278,6 +278,87 @@ void ModrithAPI::useFallbackVersions(const QString& loader)
     emit AvailableVersions(loader, versions);
 }
 
+// ===================== TAG ICONS (CATEGORIES / LOADERS) =====================
+void ModrithAPI::fetchCategories()
+{
+    QUrl url(apiUrl + "/tag/category");
+    QNetworkRequest req(url);
+    req.setRawHeader("User-Agent", "MinecraftLauncher/1.0 (Qt)");
+
+    QNetworkReply* reply = manager.get(req);
+    connect(reply, &QNetworkReply::finished, this, [this, reply]()
+            {
+                reply->deleteLater();
+
+                QVector<TagInfo> out;
+                if (reply->error() == QNetworkReply::NoError)
+                {
+                    QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+                    if (doc.isArray())
+                    {
+                        for (const auto& v : doc.array())
+                        {
+                            QJsonObject o = v.toObject();
+                            if (o["project_type"].toString() != "mod")
+                                continue;
+
+                            TagInfo t;
+                            t.name   = o["name"].toString();
+                            t.icon   = o["icon"].toString();
+                            t.header = o["header"].toString();
+                            out.push_back(t);
+                        }
+                    }
+                }
+                emit CategoriesReceived(out);
+            });
+}
+
+void ModrithAPI::fetchLoaders()
+{
+    QUrl url(apiUrl + "/tag/loader");
+    QNetworkRequest req(url);
+    req.setRawHeader("User-Agent", "MinecraftLauncher/1.0 (Qt)");
+
+    QNetworkReply* reply = manager.get(req);
+    connect(reply, &QNetworkReply::finished, this, [this, reply]()
+            {
+                reply->deleteLater();
+
+                QVector<TagInfo> out;
+                if (reply->error() == QNetworkReply::NoError)
+                {
+                    QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+                    if (doc.isArray())
+                    {
+                        for (const auto& v : doc.array())
+                        {
+                            QJsonObject o = v.toObject();
+
+                            // Только загрузчики, поддерживающие моды.
+                            bool supportsMod = false;
+                            for (const auto& pt : o["supported_project_types"].toArray())
+                            {
+                                if (pt.toString() == "mod")
+                                {
+                                    supportsMod = true;
+                                    break;
+                                }
+                            }
+                            if (!supportsMod)
+                                continue;
+
+                            TagInfo t;
+                            t.name = o["name"].toString();
+                            t.icon = o["icon"].toString();
+                            out.push_back(t);
+                        }
+                    }
+                }
+                emit LoadersReceived(out);
+            });
+}
+
 // ===================== DOWNLOAD LINKS =====================
 void ModrithAPI::getDownloadLinks(QString slug,
                                   QString minecraftVersion,

@@ -13,11 +13,17 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QComboBox>
+#include <QCheckBox>
 #include <QNetworkReply>
 #include <QDesktopServices>
 #include <QMouseEvent>
 #include <QDateTime>
 #include <QSet>
+#include <QSvgRenderer>
+#include <QPainter>
+#include <QPixmap>
+#include <QByteArray>
+#include <QRegularExpression>
 #include <functional>
 
 // ── Палитра в стиле Modrinth (тёмная тема) ───────────────────────────────────
@@ -49,6 +55,22 @@ QString scrollbarStyle()
         "QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }")
         .arg(kBorder);
 }
+
+// Кликабельная «шапка» секции: обычный QFrame с layout (рендерится надёжно,
+// в отличие от layout внутри QPushButton) + клик через std::function.
+class ClickableFrame : public QFrame
+{
+public:
+    using QFrame::QFrame;
+    std::function<void()> onClick;
+protected:
+    void mouseReleaseEvent(QMouseEvent* e) override
+    {
+        if (e->button() == Qt::LeftButton && onClick && rect().contains(e->pos()))
+            onClick();
+        QFrame::mouseReleaseEvent(e);
+    }
+};
 
 bool isLoaderTag(const QString& tag)
 {
@@ -171,16 +193,20 @@ ModWindow::ModWindow(QWidget *parent) : QDialog(parent)
     // ── Сигналы ───────────────────────────────────────────────────────────────
     connect(searchButton, &QPushButton::clicked, this, &ModWindow::applyFilters);
     connect(searchEdit, &QLineEdit::returnPressed, this, &ModWindow::applyFilters);
-    connect(versionFilter, &QComboBox::currentIndexChanged, this, &ModWindow::applyFilters);
-    connect(loaderFilter, &QComboBox::currentTextChanged, this, &ModWindow::updateVersionsForLoader);
     connect(sortCombo, &QComboBox::currentIndexChanged, this, &ModWindow::applyFilters);
     connect(viewCombo, &QComboBox::currentIndexChanged, this, &ModWindow::applyFilters);
 
     connect(api, &ModrithAPI::AvailableVersions, this, &ModWindow::onAvailableVersions);
+    connect(api, &ModrithAPI::CategoriesReceived, this, &ModWindow::onCategoriesReceived);
+    connect(api, &ModrithAPI::LoadersReceived, this, &ModWindow::onLoadersReceived);
     connect(api, &ModrithAPI::ModList, this, &ModWindow::addModCards);
     connect(api, &ModrithAPI::OnError, this, [this](const QString& error){
         QMessageBox::warning(this, "Modrinth", error);
     });
+
+    // Подтягиваем SVG-иконки категорий и загрузчиков из Modrinth.
+    api->fetchCategories();
+    api->fetchLoaders();
 
     updateVersionsForLoader();
 }
@@ -202,56 +228,86 @@ QWidget* ModWindow::buildSidebar()
     side->setContentsMargins(0, 0, 8, 0);
     side->setSpacing(10);
 
-    QString comboStyle = QString(
-        "QComboBox { background-color: %1; border: 1px solid %2; border-radius: 8px;"
-        " padding: 8px 10px; color: %3; }"
-        "QComboBox:hover { border: 1px solid %4; }"
-        "QComboBox::drop-down { border: none; width: 24px; }"
-        "QComboBox QAbstractItemView { background-color: %1; color: %3; border: 1px solid %2;"
-        " outline: none; selection-background-color: %4; selection-color: #0A0A0A; }")
-        .arg(kBg, kBorder, kText, kAccent);
-
-    QString itemStyle = QString(
+    const QString rowStyle = QString(
         "QPushButton { text-align: left; padding: 7px 10px; border: none;"
-        " border-radius: 6px; color: %1; background: transparent; }"
+        " border-radius: 8px; color: %1; background: transparent; }"
         "QPushButton:hover { background-color: %2; color: %3; }"
         "QPushButton:checked { background-color: %4; color: #0A0A0A; font-weight: bold; }")
-        .arg(kTextDim, kBg, kText, kAccent);
+        .arg(kTextDim, kPanelHi, kText, kAccent);
 
-    // ── Версия игры ────────────────────────────────────────────────────────────
+    // ── Версия игры: поиск + список + «Показать все версии» ─────────────────────
     QWidget* verContent = new QWidget();
     QVBoxLayout* verL = new QVBoxLayout(verContent);
     verL->setContentsMargins(14, 0, 14, 14);
-    versionFilter = new QComboBox(this);
-    versionFilter->setStyleSheet(comboStyle);
-    verL->addWidget(versionFilter);
+    verL->setSpacing(8);
 
-    // ── Загрузчик ──────────────────────────────────────────────────────────────
-    QWidget* loaderContent = new QWidget();
-    QVBoxLayout* loaderL = new QVBoxLayout(loaderContent);
-    loaderL->setContentsMargins(14, 0, 14, 14);
-    loaderFilter = new QComboBox(this);
-    loaderFilter->addItems({"Любой загрузчик", "fabric", "forge", "neoforge", "quilt"});
-    loaderFilter->setStyleSheet(comboStyle);
-    loaderL->addWidget(loaderFilter);
+    versionSearch = new QLineEdit(verContent);
+    versionSearch->setPlaceholderText("Найти версию...");
+    versionSearch->setClearButtonEnabled(true);
+    versionSearch->setStyleSheet(QString(
+        "QLineEdit { background-color: %1; border: 1px solid %2; border-radius: 8px;"
+        " padding: 6px 10px; color: %3; }"
+        "QLineEdit:focus { border: 1px solid %4; }").arg(kBg, kBorder, kText, kAccent));
+    verL->addWidget(versionSearch);
 
-    // ── Категория ──────────────────────────────────────────────────────────────
+    QScrollArea* verScroll = new QScrollArea(verContent);
+    verScroll->setWidgetResizable(true);
+    verScroll->setFrameShape(QFrame::NoFrame);
+    verScroll->setMaximumHeight(240);
+    verScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    verScroll->setStyleSheet(scrollbarStyle());
+    QWidget* verListWrap = new QWidget();
+    verListWrap->setStyleSheet("background: transparent;");
+    versionListLayout = new QVBoxLayout(verListWrap);
+    versionListLayout->setContentsMargins(0, 0, 0, 0);
+    versionListLayout->setSpacing(2);
+    versionListLayout->setAlignment(Qt::AlignTop);
+    verScroll->setWidget(verListWrap);
+    verL->addWidget(verScroll);
+
+    QCheckBox* showAllChk = new QCheckBox("Показать все версии", verContent);
+    showAllChk->setCursor(Qt::PointingHandCursor);
+    showAllChk->setStyleSheet(QString(
+        "QCheckBox { color: %1; spacing: 8px; }"
+        "QCheckBox::indicator { width: 16px; height: 16px; border: 1px solid %2;"
+        " border-radius: 4px; background: %3; }"
+        "QCheckBox::indicator:checked { background: %4; border: 1px solid %4; }")
+        .arg(kTextDim, kBorder, kBg, kAccent));
+    connect(showAllChk, &QCheckBox::toggled, this, [this](bool on) {
+        showAllVersions = on;
+        rebuildVersionList();
+    });
+    verL->addWidget(showAllChk);
+
+    connect(versionSearch, &QLineEdit::textChanged, this, [this]() {
+        rebuildVersionList();
+    });
+
+    // ── Загрузчик: список с иконками + «Показать ещё» ───────────────────────────
+    QWidget* loaderContentW = new QWidget();
+    loaderListLayout = new QVBoxLayout(loaderContentW);
+    loaderListLayout->setContentsMargins(10, 0, 10, 12);
+    loaderListLayout->setSpacing(2);
+    loaderListLayout->setAlignment(Qt::AlignTop);
+    rebuildLoaderList();
+
+    // ── Категория: список с иконками ────────────────────────────────────────────
     QWidget* catContent = new QWidget();
     categoryListLayout = new QVBoxLayout(catContent);
-    categoryListLayout->setContentsMargins(8, 0, 8, 12);
+    categoryListLayout->setContentsMargins(10, 0, 10, 12);
     categoryListLayout->setSpacing(2);
     buildCategoryList();
 
-    // ── Окружение ──────────────────────────────────────────────────────────────
+    // ── Окружение ───────────────────────────────────────────────────────────────
     QWidget* envContent = new QWidget();
     QVBoxLayout* envL = new QVBoxLayout(envContent);
-    envL->setContentsMargins(8, 0, 8, 12);
-    envL->setSpacing(4);
+    envL->setContentsMargins(10, 0, 10, 12);
+    envL->setSpacing(2);
 
     clientButton = new QPushButton("Клиент", this);
     clientButton->setCheckable(true);
     clientButton->setCursor(Qt::PointingHandCursor);
-    clientButton->setStyleSheet(itemStyle);
+    clientButton->setStyleSheet(rowStyle);
     connect(clientButton, &QPushButton::clicked, this, [this]() {
         selectEnvironment(selectedEnvironment == "client" ? QString() : QString("client"));
     });
@@ -259,7 +315,7 @@ QWidget* ModWindow::buildSidebar()
     serverButton = new QPushButton("Сервер", this);
     serverButton->setCheckable(true);
     serverButton->setCursor(Qt::PointingHandCursor);
-    serverButton->setStyleSheet(itemStyle);
+    serverButton->setStyleSheet(rowStyle);
     connect(serverButton, &QPushButton::clicked, this, [this]() {
         selectEnvironment(selectedEnvironment == "server" ? QString() : QString("server"));
     });
@@ -268,42 +324,56 @@ QWidget* ModWindow::buildSidebar()
     envL->addWidget(serverButton);
 
     // ── Секции-аккордеоны ──────────────────────────────────────────────────────
-    side->addWidget(makeSection("Версия игры", verContent,    &versionSummary,     false));
-    side->addWidget(makeSection("Загрузчик",   loaderContent, &loaderSummary,      false));
-    side->addWidget(makeSection("Категория",   catContent,    &categorySummary,    false));
-    side->addWidget(makeSection("Окружение",   envContent,    &environmentSummary, false));
+    side->addWidget(makeSection("Версия игры", verContent,       &versionSummary,     &versionContent,     false));
+    side->addWidget(makeSection("Загрузчик",   loaderContentW,   &loaderSummary,      &loaderContent,      false));
+    side->addWidget(makeSection("Категория",   catContent,       &categorySummary,    &categoryContent,    false));
+    side->addWidget(makeSection("Окружение",   envContent,       &environmentSummary, &environmentContent, false));
     side->addStretch(1);
 
     sideScroll->setWidget(panel);
     return sideScroll;
 }
 
-// Создаёт сворачиваемую секцию: клик по заголовку открывает/закрывает контент.
+// Создаёт сворачиваемую секцию (плоский стиль с разделителем снизу): клик по
+// заголовку открывает/закрывает контент, шеврон справа (▴ открыто / ▾ закрыто).
 QWidget* ModWindow::makeSection(const QString& title, QWidget* content,
-                                QLabel** summaryOut, bool expanded)
+                                QLabel** summaryOut, QWidget** contentOut, bool expanded)
 {
+    const QString chevUp   = QString::fromUtf8("\u25B4"); // ▴
+    const QString chevDown = QString::fromUtf8("\u25BE"); // ▾
+
     QWidget* container = new QWidget(this);
     container->setObjectName("section");
-    container->setStyleSheet(QString("QWidget#section { background-color: %1;"
-                                     " border-radius: 10px; }").arg(kPanel));
+    container->setStyleSheet(QString(
+        "QWidget#section { background: transparent; border-bottom: 1px solid %1; }")
+        .arg(kBorder));
 
     QVBoxLayout* v = new QVBoxLayout(container);
     v->setContentsMargins(0, 0, 0, 0);
     v->setSpacing(0);
 
-    // Заголовок-кнопка (текст самой кнопки — без вложенного layout, иначе не рендерится)
-    QPushButton* header = new QPushButton(container);
-    header->setCheckable(true);
-    header->setChecked(expanded);
+    // Заголовок: кликабельный QFrame с layout (надёжно рендерится).
+    ClickableFrame* header = new ClickableFrame(container);
     header->setCursor(Qt::PointingHandCursor);
-    header->setText((expanded ? QString::fromUtf8("\u25BE  ")
-                              : QString::fromUtf8("\u25B8  ")) + title);
-    header->setStyleSheet(QString(
-        "QPushButton { border: none; background: transparent; text-align: left;"
-        " padding: 12px 14px; color: %1; font-weight: bold; font-size: 14px; }"
-        "QPushButton:hover { color: %2; }").arg(kText, kAccent));
+    header->setStyleSheet("QFrame:hover { background: transparent; }");
+    QHBoxLayout* hl = new QHBoxLayout(header);
+    hl->setContentsMargins(14, 12, 14, 12);
+    hl->setSpacing(8);
 
-    // Чип-сводка активного выбора (виден, когда есть значение)
+    QLabel* titleLbl = new QLabel(title, header);
+    titleLbl->setAttribute(Qt::WA_TransparentForMouseEvents);
+    titleLbl->setStyleSheet(QString("color: %1; font-weight: bold; font-size: 14px;"
+                                    " background: transparent;").arg(kText));
+
+    QLabel* chev = new QLabel(expanded ? chevUp : chevDown, header);
+    chev->setAttribute(Qt::WA_TransparentForMouseEvents);
+    chev->setStyleSheet(QString("color: %1; background: transparent;").arg(kTextDim));
+
+    hl->addWidget(titleLbl);
+    hl->addStretch(1);
+    hl->addWidget(chev);
+
+    // Чип-сводка активного выбора (виден, только когда секция свёрнута и есть значение)
     QWidget* summaryWrap = new QWidget(container);
     QHBoxLayout* sw = new QHBoxLayout(summaryWrap);
     sw->setContentsMargins(14, 0, 14, 12);
@@ -323,45 +393,82 @@ QWidget* ModWindow::makeSection(const QString& title, QWidget* content,
     v->addWidget(summaryWrap);
     v->addWidget(content);
 
-    connect(header, &QPushButton::toggled, container, [content, header, title](bool on) {
-        content->setVisible(on);
-        header->setText((on ? QString::fromUtf8("\u25BE  ")
-                            : QString::fromUtf8("\u25B8  ")) + title);
-    });
+    header->onClick = [this, content, chev, chevUp, chevDown]() {
+        bool now = !content->isVisible();
+        content->setVisible(now);
+        chev->setText(now ? chevUp : chevDown);
+        refreshSummaryVisibility();
+    };
 
-    if (summaryOut)
-        *summaryOut = summary;
+    if (summaryOut)  *summaryOut  = summary;
+    if (contentOut)  *contentOut  = content;
     return container;
 }
 
-// Обновляет чипы-сводки под заголовками секций по текущим фильтрам.
+// Обновляет тексты чипов-сводок под заголовками секций по текущим фильтрам.
 void ModWindow::updateSidebarSummaries()
 {
-    auto setSummary = [](QLabel* lbl, const QString& text) {
-        if (!lbl) return;
-        lbl->setText(text);
-        if (QWidget* wrap = lbl->parentWidget())
-            wrap->setVisible(!text.isEmpty());
+    auto setText = [](QLabel* lbl, const QString& text) {
+        if (lbl) lbl->setText(text);
     };
 
-    setSummary(versionSummary, currentVersion());
+    setText(versionSummary, currentVersion());
 
-    QString loader;
-    if (loaderFilter && loaderFilter->currentIndex() != 0)
-    {
-        loader = loaderFilter->currentText();
-        if (!loader.isEmpty())
-            loader[0] = loader[0].toUpper();
-    }
-    setSummary(loaderSummary, loader);
+    QString loader = selectedLoader;
+    if (!loader.isEmpty())
+        loader[0] = loader[0].toUpper();
+    setText(loaderSummary, loader);
 
-    setSummary(categorySummary,
-               selectedCategory.isEmpty() ? QString() : prettyCategory(selectedCategory));
+    setText(categorySummary,
+            selectedCategory.isEmpty() ? QString() : prettyCategory(selectedCategory));
 
-    setSummary(environmentSummary,
-               selectedEnvironment.isEmpty()
-                   ? QString()
-                   : (selectedEnvironment == "server" ? "Сервер" : "Клиент"));
+    setText(environmentSummary,
+            selectedEnvironment.isEmpty()
+                ? QString()
+                : (selectedEnvironment == "server" ? "Сервер" : "Клиент"));
+
+    refreshSummaryVisibility();
+}
+
+// Чип-сводка видна, только когда секция свёрнута и есть выбранное значение.
+void ModWindow::refreshSummaryVisibility()
+{
+    auto upd = [](QLabel* lbl, QWidget* content) {
+        if (!lbl) return;
+        QWidget* wrap = lbl->parentWidget();
+        if (!wrap) return;
+        const bool collapsed = (content && !content->isVisible());
+        wrap->setVisible(collapsed && !lbl->text().isEmpty());
+    };
+
+    upd(versionSummary,     versionContent);
+    upd(loaderSummary,      loaderContent);
+    upd(categorySummary,    categoryContent);
+    upd(environmentSummary, environmentContent);
+}
+
+// ── Рендер SVG-иконки Modrinth в QIcon нужного цвета ─────────────────────────
+QIcon ModWindow::makeSvgIcon(const QString& svg, const QString& colorHex, int px)
+{
+    if (svg.trimmed().isEmpty())
+        return QIcon();
+
+    // Иконки Modrinth используют currentColor (stroke/fill) — перекрашиваем под тему.
+    QString markup = svg;
+    markup.replace("currentColor", colorHex);
+
+    QSvgRenderer renderer(markup.toUtf8());
+    if (!renderer.isValid())
+        return QIcon();
+
+    const qreal dpr = 2.0;
+    QPixmap pix(int(px * dpr), int(px * dpr));
+    pix.fill(Qt::transparent);
+    QPainter p(&pix);
+    renderer.render(&p);
+    p.end();
+    pix.setDevicePixelRatio(dpr);
+    return QIcon(pix);
 }
 
 void ModWindow::buildCategoryList()
@@ -376,10 +483,10 @@ void ModWindow::buildCategoryList()
 
     QString itemStyle = QString(
         "QPushButton { text-align: left; padding: 6px 8px; border: none;"
-        " border-radius: 6px; color: %1; background: transparent; }"
-        "QPushButton:hover { background-color: %2; }"
-        "QPushButton:checked { background-color: %3; color: #0A0A0A; font-weight: bold; }")
-        .arg(kTextDim, kPanelHi, kAccent);
+        " border-radius: 8px; color: %1; background: transparent; }"
+        "QPushButton:hover { background-color: %2; color: %3; }"
+        "QPushButton:checked { background-color: %4; color: #0A0A0A; font-weight: bold; }")
+        .arg(kTextDim, kPanelHi, kText, kAccent);
 
     for (const QString& slug : cats)
     {
@@ -387,6 +494,7 @@ void ModWindow::buildCategoryList()
         btn->setCheckable(true);
         btn->setCursor(Qt::PointingHandCursor);
         btn->setStyleSheet(itemStyle);
+        btn->setIconSize(QSize(18, 18));
         btn->setProperty("slug", slug);
 
         connect(btn, &QPushButton::clicked, this, [this, slug]() {
@@ -395,6 +503,179 @@ void ModWindow::buildCategoryList()
 
         categoryButtons.push_back(btn);
         categoryListLayout->addWidget(btn);
+    }
+
+    updateCategoryIcons();
+}
+
+// ── Список версий (фильтр по поиску и «только релизы») ───────────────────────
+void ModWindow::rebuildVersionList()
+{
+    if (!versionListLayout)
+        return;
+
+    // Чистим текущие кнопки
+    QLayoutItem* it;
+    while ((it = versionListLayout->takeAt(0)) != nullptr) {
+        if (it->widget()) it->widget()->deleteLater();
+        delete it;
+    }
+    versionButtons.clear();
+
+    const QString rowStyle = QString(
+        "QPushButton { text-align: left; padding: 6px 10px; border: none;"
+        " border-radius: 8px; color: %1; background: transparent; }"
+        "QPushButton:hover { background-color: %2; color: %3; }"
+        "QPushButton:checked { background-color: %4; color: #0A0A0A; font-weight: bold; }")
+        .arg(kTextDim, kPanelHi, kText, kAccent);
+
+    const QString query = versionSearch ? versionSearch->text().trimmed() : QString();
+    static const QRegularExpression releaseRe("^[0-9]+\\.[0-9]+(\\.[0-9]+)?$");
+
+    for (const QString& v : allVersions)
+    {
+        if (!showAllVersions && !releaseRe.match(v).hasMatch())
+            continue;
+        if (!query.isEmpty() && !v.contains(query, Qt::CaseInsensitive))
+            continue;
+
+        QPushButton* btn = new QPushButton(v);
+        btn->setCheckable(true);
+        btn->setChecked(v == selectedVersion);
+        btn->setCursor(Qt::PointingHandCursor);
+        btn->setStyleSheet(rowStyle);
+        connect(btn, &QPushButton::clicked, this, [this, v]() {
+            selectVersion(selectedVersion == v ? QString() : v);
+        });
+        versionButtons.push_back(btn);
+        versionListLayout->addWidget(btn);
+    }
+}
+
+// ── Список загрузчиков (иконки + зелёная «таблетка» + «Показать ещё») ─────────
+void ModWindow::rebuildLoaderList()
+{
+    if (!loaderListLayout)
+        return;
+
+    QLayoutItem* it;
+    while ((it = loaderListLayout->takeAt(0)) != nullptr) {
+        if (it->widget()) it->widget()->deleteLater();
+        delete it;
+    }
+    loaderButtons.clear();
+
+    const QString rowStyle = QString(
+        "QPushButton { text-align: left; padding: 7px 10px; border: none;"
+        " border-radius: 8px; color: %1; background: transparent; }"
+        "QPushButton:hover { background-color: %2; color: %3; }"
+        "QPushButton:checked { background-color: %4; color: #0A0A0A; font-weight: bold; }")
+        .arg(kTextDim, kPanelHi, kText, kAccent);
+
+    // Имена загрузчиков: из API, иначе — короткий запасной набор.
+    QStringList names;
+    if (!loaderTags.isEmpty())
+        for (const TagInfo& t : loaderTags) names << t.name;
+    else
+        names = {"fabric", "forge", "neoforge", "quilt"};
+
+    const int limit = 6;
+    const int total = names.size();
+    const int shownCount = showAllLoaders ? total : qMin(limit, total);
+
+    for (int i = 0; i < shownCount; ++i)
+    {
+        const QString slug = names.at(i);
+        QPushButton* btn = new QPushButton(prettyCategory(slug));
+        btn->setCheckable(true);
+        btn->setChecked(slug.toLower() == selectedLoader);
+        btn->setCursor(Qt::PointingHandCursor);
+        btn->setStyleSheet(rowStyle);
+        btn->setIconSize(QSize(18, 18));
+        btn->setProperty("slug", slug.toLower());
+        if (loaderIcons.contains(slug))
+            btn->setIcon(makeSvgIcon(loaderIcons.value(slug), kTextDim));
+
+        connect(btn, &QPushButton::clicked, this, [this, slug]() {
+            const QString l = slug.toLower();
+            selectLoader(selectedLoader == l ? QString() : l);
+        });
+        loaderButtons.push_back(btn);
+        loaderListLayout->addWidget(btn);
+    }
+
+    if (total > limit)
+    {
+        QPushButton* more = new QPushButton(
+            showAllLoaders ? QString("Свернуть")
+                           : QString("Показать ещё (%1)").arg(total - limit));
+        more->setCursor(Qt::PointingHandCursor);
+        more->setStyleSheet(QString(
+            "QPushButton { text-align: left; padding: 6px 10px; border: none;"
+            " background: transparent; color: %1; }"
+            "QPushButton:hover { color: %2; }").arg(kTextDim, kAccent));
+        connect(more, &QPushButton::clicked, this, [this]() {
+            showAllLoaders = !showAllLoaders;
+            rebuildLoaderList();
+        });
+        loaderListLayout->addWidget(more);
+    }
+}
+
+void ModWindow::selectVersion(const QString& version)
+{
+    selectedVersion = version;
+    for (QPushButton* b : versionButtons)
+        b->setChecked(b->text() == version);
+
+    rebuildActiveFilters();
+    applyFilters();
+}
+
+void ModWindow::selectLoader(const QString& loader)
+{
+    selectedLoader = loader;   // нижний регистр или пусто
+    for (QPushButton* b : loaderButtons)
+        b->setChecked(b->property("slug").toString() == loader);
+
+    rebuildActiveFilters();
+    // Список версий зависит от загрузчика; обновление само вызовет applyFilters().
+    updateVersionsForLoader();
+}
+
+void ModWindow::onCategoriesReceived(const QVector<TagInfo>& categories)
+{
+    for (const TagInfo& t : categories)
+        categoryIcons.insert(t.name, t.icon);
+    updateCategoryIcons();
+}
+
+void ModWindow::onLoadersReceived(const QVector<TagInfo>& loaders)
+{
+    loaderTags = loaders;
+    loaderIcons.clear();
+    for (const TagInfo& t : loaders)
+        loaderIcons.insert(t.name, t.icon);
+    rebuildLoaderList();
+}
+
+void ModWindow::updateCategoryIcons()
+{
+    for (QPushButton* b : categoryButtons)
+    {
+        const QString slug = b->property("slug").toString();
+        if (categoryIcons.contains(slug))
+            b->setIcon(makeSvgIcon(categoryIcons.value(slug), kTextDim));
+    }
+}
+
+void ModWindow::updateLoaderIcons()
+{
+    for (QPushButton* b : loaderButtons)
+    {
+        const QString slug = b->property("slug").toString();
+        if (loaderIcons.contains(slug))
+            b->setIcon(makeSvgIcon(loaderIcons.value(slug), kTextDim));
     }
 }
 
@@ -462,10 +743,14 @@ void ModWindow::rebuildActiveFilters()
     };
 
     if (!version.isEmpty())
-        addChip(version, [this]() { versionFilter->setCurrentText("Любая версия"); });
+        addChip(version, [this]() { selectVersion(QString()); });
 
     if (!loader.isEmpty())
-        addChip(loaderFilter->currentText(), [this]() { loaderFilter->setCurrentIndex(0); });
+    {
+        QString loaderLabel = loader;
+        loaderLabel[0] = loaderLabel[0].toUpper();
+        addChip(loaderLabel, [this]() { selectLoader(QString()); });
+    }
 
     if (!selectedCategory.isEmpty())
         addChip(prettyCategory(selectedCategory), [this]() { selectCategory(QString()); });
@@ -481,56 +766,45 @@ void ModWindow::clearAllFilters()
 {
     selectedCategory.clear();
     selectedEnvironment.clear();
+    selectedVersion.clear();
+    selectedLoader.clear();
+
     for (QPushButton* b : categoryButtons)
         b->setChecked(false);
     if (clientButton) clientButton->setChecked(false);
     if (serverButton) serverButton->setChecked(false);
+    rebuildLoaderList();
 
-    // Сброс загрузчика обновит версии и сам вызовет applyFilters
-    if (loaderFilter->currentIndex() != 0)
-        loaderFilter->setCurrentIndex(0);
-    else
-        versionFilter->setCurrentText("Любая версия");
-
+    // Сброс загрузчика вернёт список версий и сам вызовет applyFilters.
+    updateVersionsForLoader();
     rebuildActiveFilters();
-    applyFilters();
 }
 
 QString ModWindow::currentVersion() const
 {
-    return (versionFilter->currentText() == "Любая версия") ? QString()
-                                                            : versionFilter->currentText();
+    return selectedVersion;
 }
 
 QString ModWindow::currentLoader() const
 {
-    return (loaderFilter->currentText() == "Любой загрузчик") ? QString()
-                                                              : loaderFilter->currentText().toLower();
+    return selectedLoader;
 }
 
 // ===================== VERSIONS =====================
 void ModWindow::updateVersionsForLoader()
 {
-    QString loader = currentLoader();
-
-    // Блокируем сигналы, чтобы промежуточные состояния списка версий
-    // не отправляли лишних запросов через currentIndexChanged.
-    versionFilter->blockSignals(true);
+    const QString loader = currentLoader();
 
     if (loader.isEmpty())
     {
-        versionFilter->clear();
-        versionFilter->addItem("Любая версия");
-        versionFilter->addItems({"1.21.1","1.21","1.20.1","1.20.2","1.20","1.19.2","1.18.2","1.17.1","1.16.5","1.12.2"});
-        versionFilter->blockSignals(false);
+        // Без загрузчика — стандартный набор популярных релизов.
+        allVersions = {"1.21.1","1.21","1.20.4","1.20.2","1.20.1","1.20",
+                       "1.19.4","1.19.2","1.18.2","1.17.1","1.16.5","1.12.2","1.8.9"};
+        rebuildVersionList();
         rebuildActiveFilters();
         applyFilters();
         return;
     }
-
-    versionFilter->clear();
-    versionFilter->addItem("Загрузка версий...");
-    versionFilter->blockSignals(false);
 
     api->fetchAvailableVersions(loader);
 }
@@ -538,14 +812,8 @@ void ModWindow::updateVersionsForLoader()
 void ModWindow::onAvailableVersions(const QString& loader, const QStringList& versions)
 {
     Q_UNUSED(loader);
-    versionFilter->blockSignals(true);
-    versionFilter->clear();
-    versionFilter->addItem("Любая версия");
-
-    for (const QString& v : versions)
-        versionFilter->addItem(v);
-    versionFilter->blockSignals(false);
-
+    allVersions = versions;
+    rebuildVersionList();
     rebuildActiveFilters();
     applyFilters();
 }

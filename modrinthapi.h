@@ -38,6 +38,13 @@ struct ModProject
     QVector<QString> gallery;
 };
 
+struct TagInfo
+{
+    QString name;   // слаг, напр. "adventure" / "fabric"
+    QString icon;   // сырой SVG-маркап из API Modrinth
+    QString header; // группа категории ("categories" и т.п.)
+};
+
 struct Mod
 {
     QString id;
@@ -76,6 +83,8 @@ public:
 
     void getProject(QString slug);
     void fetchAvailableVersions(const QString& loader);
+    void fetchCategories();
+    void fetchLoaders();
 
 signals:
     void ProjectReceived(const ModProject& project);
@@ -83,6 +92,8 @@ signals:
     void DownloadLinks(const QVector<QUrl>& urls);
     void OnError(const QString& error);
     void AvailableVersions(const QString& loader, const QStringList& versions);
+    void CategoriesReceived(const QVector<TagInfo>& categories);
+    void LoadersReceived(const QVector<TagInfo>& loaders);
 
 public:
     QNetworkAccessManager manager;
