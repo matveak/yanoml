@@ -41,6 +41,9 @@ private:
 
     // Сайдбар фильтров
     QWidget* buildSidebar();
+    QWidget* makeSection(const QString& title, QWidget* content,
+                         QLabel** summaryOut, bool expanded);
+    void updateSidebarSummaries();
     void buildCategoryList();
     void selectCategory(const QString& category);
     void selectEnvironment(const QString& environment);
@@ -77,6 +80,12 @@ private:
     QList<QPushButton*> categoryButtons;
     QPushButton* clientButton = nullptr;
     QPushButton* serverButton = nullptr;
+
+    // Чипы-сводки под заголовками свёрнутых секций
+    QLabel* versionSummary = nullptr;
+    QLabel* loaderSummary = nullptr;
+    QLabel* categorySummary = nullptr;
+    QLabel* environmentSummary = nullptr;
 
     QString selectedCategory;      // "" = любая
     QString selectedEnvironment;   // "" = любая ("client"/"server")

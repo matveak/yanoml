@@ -39,6 +39,17 @@ QString prettyCategory(const QString& slug)
     return s;
 }
 
+QString scrollbarStyle()
+{
+    return QString(
+        "QScrollBar:vertical { background: transparent; width: 10px; margin: 0; }"
+        "QScrollBar::handle:vertical { background: %1; border-radius: 5px; min-height: 30px; }"
+        "QScrollBar::handle:vertical:hover { background: #4A4F57; }"
+        "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }"
+        "QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }")
+        .arg(kBorder);
+}
+
 bool isLoaderTag(const QString& tag)
 {
     static const QSet<QString> loaders = {
@@ -141,6 +152,7 @@ ModWindow::ModWindow(QWidget *parent) : QDialog(parent)
     scrollArea = new QScrollArea(this);
     scrollArea->setWidgetResizable(true);
     scrollArea->setFrameShape(QFrame::NoFrame);
+    scrollArea->setStyleSheet(scrollbarStyle());
 
     cardsWidget = new QWidget();
     cardsLayout = new QVBoxLayout(cardsWidget);
@@ -179,60 +191,62 @@ QWidget* ModWindow::buildSidebar()
     QScrollArea* sideScroll = new QScrollArea(this);
     sideScroll->setWidgetResizable(true);
     sideScroll->setFrameShape(QFrame::NoFrame);
-    sideScroll->setFixedWidth(280);
+    sideScroll->setFixedWidth(300);
     sideScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    sideScroll->setStyleSheet(scrollbarStyle());
 
     QWidget* panel = new QWidget();
-    panel->setStyleSheet(QString("background-color: %1; border-radius: 10px;").arg(kPanel));
+    panel->setStyleSheet("background: transparent;");
 
     QVBoxLayout* side = new QVBoxLayout(panel);
-    side->setContentsMargins(16, 16, 16, 16);
-    side->setSpacing(8);
-
-    auto addHeader = [&](const QString& text) {
-        QLabel* h = new QLabel(text);
-        h->setStyleSheet(QString("color: %1; font-weight: bold; font-size: 14px;"
-                                 " margin-top: 6px;").arg(kText));
-        side->addWidget(h);
-    };
+    side->setContentsMargins(0, 0, 8, 0);
+    side->setSpacing(10);
 
     QString comboStyle = QString(
-        "QComboBox { background-color: %1; border: 1px solid %2; border-radius: 6px;"
-        " padding: 6px 8px; color: %3; }"
+        "QComboBox { background-color: %1; border: 1px solid %2; border-radius: 8px;"
+        " padding: 8px 10px; color: %3; }"
         "QComboBox:hover { border: 1px solid %4; }"
-        "QComboBox QAbstractItemView { background-color: %1; color: %3;"
-        " selection-background-color: %4; selection-color: #0A0A0A; }")
-        .arg(kPanelHi, kBorder, kText, kAccent);
+        "QComboBox::drop-down { border: none; width: 24px; }"
+        "QComboBox QAbstractItemView { background-color: %1; color: %3; border: 1px solid %2;"
+        " outline: none; selection-background-color: %4; selection-color: #0A0A0A; }")
+        .arg(kBg, kBorder, kText, kAccent);
 
-    // Версия игры
-    addHeader("Версия игры");
+    QString itemStyle = QString(
+        "QPushButton { text-align: left; padding: 7px 10px; border: none;"
+        " border-radius: 6px; color: %1; background: transparent; }"
+        "QPushButton:hover { background-color: %2; color: %3; }"
+        "QPushButton:checked { background-color: %4; color: #0A0A0A; font-weight: bold; }")
+        .arg(kTextDim, kBg, kText, kAccent);
+
+    // ── Версия игры ────────────────────────────────────────────────────────────
+    QWidget* verContent = new QWidget();
+    QVBoxLayout* verL = new QVBoxLayout(verContent);
+    verL->setContentsMargins(14, 0, 14, 14);
     versionFilter = new QComboBox(this);
     versionFilter->setStyleSheet(comboStyle);
-    side->addWidget(versionFilter);
+    verL->addWidget(versionFilter);
 
-    // Загрузчик
-    addHeader("Загрузчик");
+    // ── Загрузчик ──────────────────────────────────────────────────────────────
+    QWidget* loaderContent = new QWidget();
+    QVBoxLayout* loaderL = new QVBoxLayout(loaderContent);
+    loaderL->setContentsMargins(14, 0, 14, 14);
     loaderFilter = new QComboBox(this);
     loaderFilter->addItems({"Любой загрузчик", "fabric", "forge", "neoforge", "quilt"});
     loaderFilter->setStyleSheet(comboStyle);
-    side->addWidget(loaderFilter);
+    loaderL->addWidget(loaderFilter);
 
-    // Категория
-    addHeader("Категория");
-    categoryListLayout = new QVBoxLayout();
-    categoryListLayout->setContentsMargins(0, 0, 0, 0);
+    // ── Категория ──────────────────────────────────────────────────────────────
+    QWidget* catContent = new QWidget();
+    categoryListLayout = new QVBoxLayout(catContent);
+    categoryListLayout->setContentsMargins(8, 0, 8, 12);
     categoryListLayout->setSpacing(2);
     buildCategoryList();
-    side->addLayout(categoryListLayout);
 
-    // Окружение
-    addHeader("Окружение");
-    QString itemStyle = QString(
-        "QPushButton { text-align: left; padding: 6px 8px; border: none;"
-        " border-radius: 6px; color: %1; background: transparent; }"
-        "QPushButton:hover { background-color: %2; }"
-        "QPushButton:checked { background-color: %3; color: #0A0A0A; font-weight: bold; }")
-        .arg(kTextDim, kPanelHi, kAccent);
+    // ── Окружение ──────────────────────────────────────────────────────────────
+    QWidget* envContent = new QWidget();
+    QVBoxLayout* envL = new QVBoxLayout(envContent);
+    envL->setContentsMargins(8, 0, 8, 12);
+    envL->setSpacing(4);
 
     clientButton = new QPushButton("Клиент", this);
     clientButton->setCheckable(true);
@@ -250,13 +264,116 @@ QWidget* ModWindow::buildSidebar()
         selectEnvironment(selectedEnvironment == "server" ? QString() : QString("server"));
     });
 
-    side->addWidget(clientButton);
-    side->addWidget(serverButton);
+    envL->addWidget(clientButton);
+    envL->addWidget(serverButton);
 
+    // ── Секции-аккордеоны ──────────────────────────────────────────────────────
+    side->addWidget(makeSection("Версия игры", verContent,    &versionSummary,     false));
+    side->addWidget(makeSection("Загрузчик",   loaderContent, &loaderSummary,      false));
+    side->addWidget(makeSection("Категория",   catContent,    &categorySummary,    false));
+    side->addWidget(makeSection("Окружение",   envContent,    &environmentSummary, false));
     side->addStretch(1);
 
     sideScroll->setWidget(panel);
     return sideScroll;
+}
+
+// Создаёт сворачиваемую секцию: клик по заголовку открывает/закрывает контент.
+QWidget* ModWindow::makeSection(const QString& title, QWidget* content,
+                                QLabel** summaryOut, bool expanded)
+{
+    QWidget* container = new QWidget(this);
+    container->setObjectName("section");
+    container->setStyleSheet(QString("QWidget#section { background-color: %1;"
+                                     " border-radius: 10px; }").arg(kPanel));
+
+    QVBoxLayout* v = new QVBoxLayout(container);
+    v->setContentsMargins(0, 0, 0, 0);
+    v->setSpacing(0);
+
+    // Заголовок-кнопка
+    QPushButton* header = new QPushButton(container);
+    header->setCheckable(true);
+    header->setChecked(expanded);
+    header->setCursor(Qt::PointingHandCursor);
+    header->setStyleSheet(
+        "QPushButton { border: none; background: transparent; text-align: left; }");
+
+    QHBoxLayout* hl = new QHBoxLayout(header);
+    hl->setContentsMargins(14, 12, 14, 12);
+
+    QLabel* tl = new QLabel(title, header);
+    tl->setStyleSheet(QString("color: %1; font-weight: bold; font-size: 14px;"
+                              " background: transparent;").arg(kText));
+    tl->setAttribute(Qt::WA_TransparentForMouseEvents);
+
+    QLabel* chev = new QLabel(expanded ? "▾" : "▸", header);
+    chev->setStyleSheet(QString("color: %1; font-size: 14px; background: transparent;")
+                            .arg(kTextDim));
+    chev->setAttribute(Qt::WA_TransparentForMouseEvents);
+
+    hl->addWidget(tl);
+    hl->addStretch(1);
+    hl->addWidget(chev);
+
+    // Чип-сводка активного выбора (виден, когда есть значение)
+    QWidget* summaryWrap = new QWidget(container);
+    QHBoxLayout* sw = new QHBoxLayout(summaryWrap);
+    sw->setContentsMargins(14, 0, 14, 12);
+    sw->setSpacing(6);
+
+    QLabel* summary = new QLabel(summaryWrap);
+    summary->setStyleSheet(QString("background-color: %1; color: %2; border-radius: 8px;"
+                                   " padding: 3px 10px;").arg(kPanelHi, kText));
+    sw->addWidget(summary);
+    sw->addStretch(1);
+    summaryWrap->setVisible(false);
+
+    content->setParent(container);
+    content->setVisible(expanded);
+
+    v->addWidget(header);
+    v->addWidget(summaryWrap);
+    v->addWidget(content);
+
+    connect(header, &QPushButton::toggled, container, [content, chev](bool on) {
+        content->setVisible(on);
+        chev->setText(on ? "▾" : "▸");
+    });
+
+    if (summaryOut)
+        *summaryOut = summary;
+    return container;
+}
+
+// Обновляет чипы-сводки под заголовками секций по текущим фильтрам.
+void ModWindow::updateSidebarSummaries()
+{
+    auto setSummary = [](QLabel* lbl, const QString& text) {
+        if (!lbl) return;
+        lbl->setText(text);
+        if (QWidget* wrap = lbl->parentWidget())
+            wrap->setVisible(!text.isEmpty());
+    };
+
+    setSummary(versionSummary, currentVersion());
+
+    QString loader;
+    if (loaderFilter && loaderFilter->currentIndex() != 0)
+    {
+        loader = loaderFilter->currentText();
+        if (!loader.isEmpty())
+            loader[0] = loader[0].toUpper();
+    }
+    setSummary(loaderSummary, loader);
+
+    setSummary(categorySummary,
+               selectedCategory.isEmpty() ? QString() : prettyCategory(selectedCategory));
+
+    setSummary(environmentSummary,
+               selectedEnvironment.isEmpty()
+                   ? QString()
+                   : (selectedEnvironment == "server" ? "Сервер" : "Клиент"));
 }
 
 void ModWindow::buildCategoryList()
@@ -322,6 +439,8 @@ void ModWindow::rebuildActiveFilters()
         if (item->widget()) item->widget()->deleteLater();
         delete item;
     }
+
+    updateSidebarSummaries();
 
     const QString version = currentVersion();
     const QString loader  = currentLoader();
