@@ -63,6 +63,8 @@ public:
     void getMods(QString query,
                  QString mcVersion = "",
                  QString loader = "",
+                 QString category = "",
+                 QString environment = "",
                  SortOrder order = SortOrder::relevance,
                  int first = 0,
                  int count = 10);

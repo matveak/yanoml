@@ -24,6 +24,8 @@ ModrithAPI::ModrithAPI(QObject* parent) : QObject(parent) {}
 void ModrithAPI::getMods(QString query,
                          QString mcVersion,
                          QString loader,
+                         QString category,
+                         QString environment,
                          SortOrder order,
                          int first,
                          int count)
@@ -38,6 +40,13 @@ void ModrithAPI::getMods(QString query,
 
     QJsonArray facets;
 
+    // Ищем только моды.
+    {
+        QJsonArray typeGroup;
+        typeGroup.append(QString("project_type:mod"));
+        facets.append(typeGroup);
+    }
+
     // Строгие фильтры
     if (!mcVersion.isEmpty() && mcVersion != "Любая версия")
     {
@@ -51,6 +60,25 @@ void ModrithAPI::getMods(QString query,
         QJsonArray loaderGroup;
         loaderGroup.append(QString("categories:%1").arg(loader));
         facets.append(loaderGroup);
+    }
+
+    if (!category.isEmpty() && category != "Любая категория")
+    {
+        QJsonArray categoryGroup;
+        categoryGroup.append(QString("categories:%1").arg(category));
+        facets.append(categoryGroup);
+    }
+
+    // Окружение: client_side/server_side бывают required/optional —
+    // оба значения подходят, поэтому это OR-группа внутри одного facet.
+    if (!environment.isEmpty() && environment != "Любая среда")
+    {
+        QString sideKey = (environment == "server") ? "server_side" : "client_side";
+
+        QJsonArray envGroup;
+        envGroup.append(QString("%1:required").arg(sideKey));
+        envGroup.append(QString("%1:optional").arg(sideKey));
+        facets.append(envGroup);
     }
 
     if (!facets.isEmpty())

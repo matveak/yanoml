@@ -93,7 +93,9 @@ void ModWindow::setupAdvancedFilters()
     // Категория
     categoryFilter = new QComboBox(this);
     categoryFilter->addItems({"Любая категория", "adventure", "optimization", "technology",
-                              "magic", "multiplayer", "combat", "quests"});
+                              "magic", "utility", "library", "decoration", "equipment",
+                              "food", "game-mechanics", "mobs", "storage", "worldgen",
+                              "social", "management", "transportation"});
     categoryFilter->setFixedWidth(180);
 
     // Окружение
@@ -154,9 +156,11 @@ void ModWindow::applyFilters()
 
     QString version = (versionFilter->currentText() == "Любая версия") ? "" : versionFilter->currentText();
     QString loader = (loaderFilter->currentText() == "Любой загрузчик") ? "" : loaderFilter->currentText().toLower();
+    QString category = (categoryFilter->currentText() == "Любая категория") ? "" : categoryFilter->currentText().toLower();
+    QString environment = (environmentFilter->currentText() == "Любая среда") ? "" : environmentFilter->currentText().toLower();
 
     clearCards();
-    api->getMods(query, version, loader, SortOrder::downloads, 0, 30);
+    api->getMods(query, version, loader, category, environment, SortOrder::downloads, 0, 30);
 }
 
 void ModWindow::addModCards(const QVector<Mod>& mods)
