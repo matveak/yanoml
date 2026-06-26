@@ -291,30 +291,17 @@ QWidget* ModWindow::makeSection(const QString& title, QWidget* content,
     v->setContentsMargins(0, 0, 0, 0);
     v->setSpacing(0);
 
-    // Заголовок-кнопка
+    // Заголовок-кнопка (текст самой кнопки — без вложенного layout, иначе не рендерится)
     QPushButton* header = new QPushButton(container);
     header->setCheckable(true);
     header->setChecked(expanded);
     header->setCursor(Qt::PointingHandCursor);
-    header->setStyleSheet(
-        "QPushButton { border: none; background: transparent; text-align: left; }");
-
-    QHBoxLayout* hl = new QHBoxLayout(header);
-    hl->setContentsMargins(14, 12, 14, 12);
-
-    QLabel* tl = new QLabel(title, header);
-    tl->setStyleSheet(QString("color: %1; font-weight: bold; font-size: 14px;"
-                              " background: transparent;").arg(kText));
-    tl->setAttribute(Qt::WA_TransparentForMouseEvents);
-
-    QLabel* chev = new QLabel(expanded ? "▾" : "▸", header);
-    chev->setStyleSheet(QString("color: %1; font-size: 14px; background: transparent;")
-                            .arg(kTextDim));
-    chev->setAttribute(Qt::WA_TransparentForMouseEvents);
-
-    hl->addWidget(tl);
-    hl->addStretch(1);
-    hl->addWidget(chev);
+    header->setText((expanded ? QString::fromUtf8("\u25BE  ")
+                              : QString::fromUtf8("\u25B8  ")) + title);
+    header->setStyleSheet(QString(
+        "QPushButton { border: none; background: transparent; text-align: left;"
+        " padding: 12px 14px; color: %1; font-weight: bold; font-size: 14px; }"
+        "QPushButton:hover { color: %2; }").arg(kText, kAccent));
 
     // Чип-сводка активного выбора (виден, когда есть значение)
     QWidget* summaryWrap = new QWidget(container);
@@ -336,9 +323,10 @@ QWidget* ModWindow::makeSection(const QString& title, QWidget* content,
     v->addWidget(summaryWrap);
     v->addWidget(content);
 
-    connect(header, &QPushButton::toggled, container, [content, chev](bool on) {
+    connect(header, &QPushButton::toggled, container, [content, header, title](bool on) {
         content->setVisible(on);
-        chev->setText(on ? "▾" : "▸");
+        header->setText((on ? QString::fromUtf8("\u25BE  ")
+                            : QString::fromUtf8("\u25B8  ")) + title);
     });
 
     if (summaryOut)
