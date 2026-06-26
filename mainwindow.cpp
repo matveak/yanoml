@@ -20,6 +20,8 @@
 #include <QTextCursor>
 #include <algorithm>
 #include <memory>
+#include <QSet>
+#include <QJsonValue>
 #include <private/qzipreader_p.h>
 
 // ==================== Java Auto-Detection ====================
@@ -401,6 +403,10 @@ void MainWindow::setupConnections()
     connect(downloader, &MinecraftDownloader::instanceCreated, this,
             [this](const QString& path)
             {
+                // При установке с загрузчиком базовое сообщение пропускаем —
+                // финальное покажем после установки самого загрузчика.
+                if (m_modLoaderPending)
+                    return;
                 progressBar->hide();
                 QMessageBox::information(this, "Готово", "Игра установлена:\n" + path);
             });
@@ -442,16 +448,69 @@ void MainWindow::on_InstallerButton_clicked()
     if (gameDir.isEmpty())
         gameDir = QDir::homePath() + "/AppData/Roaming/.minecraft";
 
-    downloader->createInstance(
-        cleanVersion,
-        loader == "vanilla" ? "" : loader,
-        "",
-        gameDir);
+    const bool modded = (loader != "vanilla" && !loader.isEmpty());
 
     progressBar->setValue(0);
     progressBar->show();
 
-    QMessageBox::information(this, "Установка", "Начато скачивание " + versionText);
+    if (!modded)
+    {
+        // Чистая ваниль.
+        downloader->createInstance(cleanVersion, "", "", gameDir);
+        QMessageBox::information(this, "Установка",
+                                "Начато скачивание " + versionText);
+        return;
+    }
+
+    // С загрузчиком: сначала ставим ванильную базу, затем сам загрузчик.
+    m_modLoaderPending = true;
+
+    auto conn = std::make_shared<QMetaObject::Connection>();
+    *conn = connect(downloader, &MinecraftDownloader::instanceCreated, this,
+        [this, conn, loader, cleanVersion, gameDir](const QString&)
+        {
+            disconnect(*conn);
+            startLoaderInstall(loader, cleanVersion, gameDir);
+        });
+
+    downloader->createInstance(cleanVersion, "", "", gameDir);
+    QMessageBox::information(this, "Установка",
+        "Начато скачивание " + versionText +
+        ".\nПосле базовой версии будет установлен загрузчик "
+        + loader + ".");
+}
+
+void MainWindow::startLoaderInstall(const QString& loader,
+                                    const QString& mcVersion,
+                                    const QString& gameDir)
+{
+    progressBar->setValue(0);
+    progressBar->show();
+
+    auto conn = std::make_shared<QMetaObject::Connection>();
+    *conn = connect(downloader, &MinecraftDownloader::loaderInstalled, this,
+        [this, conn](const QString& versionId)
+        {
+            disconnect(*conn);
+            m_modLoaderPending = false;
+            progressBar->hide();
+            QMessageBox::information(this, "Готово",
+                "Загрузчик установлен:\n" + versionId);
+        });
+
+    if (loader == "fabric")
+    {
+        downloader->installFabric(mcVersion, gameDir);
+    }
+    else // forge / neoforge — нужен Java для запуска установщика
+    {
+        int requiredMajor = requiredJavaMajor(mcVersion);
+        ensureJava(requiredMajor, mcVersion, gameDir,
+            [this, loader, mcVersion, gameDir](const QString& javaExe)
+            {
+                downloader->installForgeLike(mcVersion, loader, javaExe, gameDir);
+            });
+    }
 }
 
 // ==================== Play ====================
@@ -462,12 +521,73 @@ void MainWindow::on_PlayButton_clicked()
     if (gameDir.isEmpty())
         gameDir = QDir::homePath() + "/AppData/Roaming/.minecraft";
 
+    QString loader = LoaderBox ? LoaderBox->currentText().toLower() : "vanilla";
+
     QString versionText = VersionBox->currentText();
     QString version = versionText;
     version.remove("Fabric ");
     version.remove("Forge ");
     version.remove("NeoForge ");
 
+    // ── Modded: запуск через профиль установленного загрузчика ──────────────
+    if (loader != "vanilla" && !loader.isEmpty())
+    {
+        QString versionId =
+            MinecraftDownloader::findInstalledLoaderId(gameDir, loader, version);
+
+        if (versionId.isEmpty())
+        {
+            QMessageBox::warning(this, "Ошибка",
+                "Загрузчик " + loader + " для " + version +
+                " не установлен.\nНажмите «Установить».");
+            return;
+        }
+
+        QString childPath =
+            gameDir + "/versions/" + versionId + "/" + versionId + ".json";
+        QFile childFile(childPath);
+        if (!childFile.open(QIODevice::ReadOnly))
+        {
+            QMessageBox::warning(this, "Ошибка",
+                "Не удалось открыть профиль загрузчика:\n" + childPath);
+            return;
+        }
+        QJsonObject childRoot =
+            QJsonDocument::fromJson(childFile.readAll()).object();
+        childFile.close();
+
+        QString parentVersion = childRoot["inheritsFrom"].toString();
+        if (parentVersion.isEmpty()) parentVersion = version;
+
+        QString parentPath =
+            gameDir + "/versions/" + parentVersion + "/" + parentVersion + ".json";
+        QFile parentFile(parentPath);
+        if (!parentFile.open(QIODevice::ReadOnly))
+        {
+            QMessageBox::warning(this, "Ошибка",
+                "Базовая версия " + parentVersion + " не установлена.");
+            return;
+        }
+        QJsonObject parentRoot =
+            QJsonDocument::fromJson(parentFile.readAll()).object();
+        parentFile.close();
+
+        int requiredMajor =
+            parentRoot["javaVersion"].toObject()["majorVersion"].toInt();
+        if (requiredMajor <= 0)
+            requiredMajor = requiredJavaMajor(parentVersion);
+
+        ensureJava(requiredMajor, parentVersion, gameDir,
+            [this, parentRoot, childRoot, gameDir, parentVersion, versionId,
+             requiredMajor](const QString& javaExe)
+            {
+                launchModded(parentRoot, childRoot, gameDir, parentVersion,
+                             versionId, javaExe, requiredMajor);
+            });
+        return;
+    }
+
+    // ── Vanilla ─────────────────────────────────────────────────────────────
     QString versionDir = gameDir + "/versions/" + version;
     QString jsonPath   = versionDir + "/" + version + ".json";
 
@@ -484,10 +604,8 @@ void MainWindow::on_PlayButton_clicked()
         return;
     }
 
-    QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+    QJsonObject root = QJsonDocument::fromJson(file.readAll()).object();
     file.close();
-
-    QJsonObject root = doc.object();
 
     QString mainClass = root["mainClass"].toString();
     if (mainClass.isEmpty())
@@ -496,24 +614,36 @@ void MainWindow::on_PlayButton_clicked()
         return;
     }
 
-    // ── Java: автовыбор / авто-скачивание ──────────────────────────────────
-
-    QJsonObject javaVer = root["javaVersion"].toObject();
-    int requiredMajor = javaVer["majorVersion"].toInt();
+    int requiredMajor = root["javaVersion"].toObject()["majorVersion"].toInt();
     if (requiredMajor <= 0)
         requiredMajor = requiredJavaMajor(version);
 
-    QString javaComponent = javaVer["component"].toString();
-    if (javaComponent.isEmpty())
-        javaComponent = javaComponentForMajor(requiredMajor);
+    ensureJava(requiredMajor, version, gameDir,
+        [this, root, gameDir, version, versionDir, mainClass, requiredMajor]
+        (const QString& javaExe)
+        {
+            launchGame(root, gameDir, version, versionDir, mainClass,
+                       javaExe, requiredMajor);
+        });
+}
+
+// ==================== Java provisioning ====================
+
+void MainWindow::ensureJava(int requiredMajor,
+                            const QString& mcVersion,
+                            const QString& gameDir,
+                            std::function<void(QString)> cb)
+{
+    Q_UNUSED(mcVersion);
+
+    const QString javaComponent = javaComponentForMajor(requiredMajor);
 
     // 1) Подходящая Java уже установлена в системе?
     QString javaPath = pickCompatibleInstalledJava(
         installedJavas, requiredMajor, settingsWindow->javaPath());
-
     if (!javaPath.isEmpty())
     {
-        launchGame(root, gameDir, version, versionDir, mainClass, javaPath, requiredMajor);
+        cb(javaPath);
         return;
     }
 
@@ -529,27 +659,26 @@ void MainWindow::on_PlayButton_clicked()
     if (QFileInfo::exists(runtimeExe))
     {
         installedJavas[requiredMajor] = runtimeExe;
-        launchGame(root, gameDir, version, versionDir, mainClass, runtimeExe, requiredMajor);
+        cb(runtimeExe);
         return;
     }
 
-    // 3) Качаем официальную Java от Mojang и запускаем после загрузки.
+    // 3) Качаем официальную Java от Mojang и вызываем cb после загрузки.
     progressBar->setValue(0);
     progressBar->show();
     QMessageBox::information(this, "Java",
-        "Для версии " + version + " нужна Java " + QString::number(requiredMajor) +
+        "Нужна Java " + QString::number(requiredMajor) +
         ".\nСкачиваю официальную Java от Mojang — это разовая операция, "
         "дождитесь завершения загрузки.");
 
     auto conn = std::make_shared<QMetaObject::Connection>();
     *conn = connect(downloader, &MinecraftDownloader::javaRuntimeReady, this,
-        [this, root, gameDir, version, versionDir, mainClass, requiredMajor, conn]
-        (const QString& javaExe)
+        [this, conn, requiredMajor, cb](const QString& javaExe)
         {
             disconnect(*conn);
             progressBar->hide();
             installedJavas[requiredMajor] = javaExe;
-            launchGame(root, gameDir, version, versionDir, mainClass, javaExe, requiredMajor);
+            cb(javaExe);
         });
 
     downloader->downloadJavaRuntime(javaComponent, runtimeDir);
@@ -719,7 +848,17 @@ void MainWindow::launchGame(const QJsonObject& root,
 
     jvmArgs << "-cp" << classPath << mainClass;
 
-    QStringList allArgs = jvmArgs + gameArgs;
+    startMinecraftProcess(javaPath, jvmArgs, gameArgs, gameDir, version, neededJava);
+}
+
+void MainWindow::startMinecraftProcess(const QString& javaPath,
+                                       const QStringList& jvmArgs,
+                                       const QStringList& gameArgs,
+                                       const QString& gameDir,
+                                       const QString& version,
+                                       int neededJava)
+{
+    const QStringList allArgs = jvmArgs + gameArgs;
 
     qDebug() << "Launching:" << javaPath;
     qDebug() << "Args:" << allArgs;
@@ -766,6 +905,271 @@ void MainWindow::launchGame(const QJsonObject& root,
     }
 
     hide();
+}
+
+// ==================== Launch (modded) ====================
+
+// Проверка os-правил аргумента (современный формат arguments.jvm/game).
+static bool argRulesAllow(const QJsonObject& argObj)
+{
+    const QJsonArray rules = argObj["rules"].toArray();
+    if (rules.isEmpty())
+        return true;
+
+    bool allowed = false;
+    for (const auto& rv : rules)
+    {
+        const QJsonObject rule = rv.toObject();
+        const QString action = rule["action"].toString();
+
+        // Аргументы под фичи (demo, has_custom_resolution, quick_play) — пропуск.
+        if (rule.contains("features"))
+            return false;
+
+        if (rule.contains("os"))
+        {
+            const QString osName = rule["os"].toObject()["name"].toString();
+#ifdef Q_OS_WIN
+            const QString cur = "windows";
+#elif defined(Q_OS_MAC)
+            const QString cur = "osx";
+#else
+            const QString cur = "linux";
+#endif
+            if (osName.isEmpty() || osName == cur)
+                allowed = (action == "allow");
+        }
+        else
+        {
+            allowed = (action == "allow");
+        }
+    }
+    return allowed;
+}
+
+// group:artifact из Maven-координат — для дедупликации classpath.
+static QString mavenKey(const QString& name)
+{
+    const QStringList parts = name.split(':');
+    if (parts.size() < 2)
+        return QString();
+    return parts[0] + ":" + parts[1];
+}
+
+void MainWindow::launchModded(const QJsonObject& parentRoot,
+                              const QJsonObject& childRoot,
+                              const QString& gameDir,
+                              const QString& mcVersion,
+                              const QString& versionId,
+                              const QString& javaPath,
+                              int neededJava)
+{
+    const int selectedMajor = getJavaMajorVersion(javaPath);
+
+    const QString versionDir = gameDir + "/versions/" + versionId;
+    const QString nativesDir = versionDir + "/natives";
+
+#ifdef Q_OS_WIN
+    const QString sep = ";";
+#else
+    const QString sep = ":";
+#endif
+
+    QString mainClass = childRoot["mainClass"].toString();
+    if (mainClass.isEmpty())
+        mainClass = parentRoot["mainClass"].toString();
+
+    // ── Classpath: библиотеки загрузчика (приоритет) + ванильные + клиент ──
+    QStringList cpEntries;
+    QSet<QString> seenKeys;
+
+    auto addLibs = [&](const QJsonObject& root)
+    {
+        const QJsonArray libs = root["libraries"].toArray();
+        for (const auto& lv : libs)
+        {
+            const QJsonObject lib = lv.toObject();
+            if (!nativeLibraryAllowedOnCurrentOS(lib))
+                continue;
+
+            const QString name = lib["name"].toString();
+            const QString key  = mavenKey(name);
+            if (!key.isEmpty() && seenKeys.contains(key))
+                continue;
+
+            QString rel;
+            const QJsonObject dl = lib["downloads"].toObject();
+            if (dl.contains("artifact"))
+                rel = dl["artifact"].toObject()["path"].toString();
+            if (rel.isEmpty() && !name.isEmpty())
+                rel = MinecraftDownloader::mavenNameToPath(name);
+            if (rel.isEmpty())
+                continue;
+
+            const QString full = gameDir + "/libraries/" + rel;
+            if (!QFileInfo::exists(full))
+                continue;
+
+            if (!key.isEmpty())
+                seenKeys.insert(key);
+            cpEntries << full;
+        }
+    };
+
+    addLibs(childRoot);   // загрузчик переопределяет ванильные версии библиотек
+    addLibs(parentRoot);
+
+    cpEntries << gameDir + "/versions/" + mcVersion + "/" + mcVersion + ".jar";
+
+    const QString classPath = cpEntries.join(sep);
+
+    // ── Natives из ванильных библиотек ──
+    extractNativesForVersion(parentRoot, gameDir, nativesDir);
+
+    // ── RAM ──
+    int ram = settingsWindow->ramAmount();
+    if (ram < 1) ram = 2;
+    const int ramMin = qMax(1, ram / 2);
+
+    // ── UUID (offline) ──
+    QString username = settingsWindow->username();
+    if (username.isEmpty()) username = "Player";
+
+    QString offlineUUID = QCryptographicHash::hash(
+                              ("OfflinePlayer:" + username).toUtf8(),
+                              QCryptographicHash::Md5).toHex();
+    offlineUUID.insert(8,  '-');
+    offlineUUID.insert(13, '-');
+    offlineUUID.insert(18, '-');
+    offlineUUID.insert(23, '-');
+
+    const QString assetsIndex = parentRoot["assets"].toString();
+    const QString versionType = childRoot.contains("type")
+                                    ? childRoot["type"].toString()
+                                    : parentRoot["type"].toString();
+
+    auto replaceVars = [&](QString arg) -> QString {
+        arg.replace("${auth_player_name}",    username);
+        arg.replace("${version_name}",        versionId);
+        arg.replace("${game_directory}",      gameDir);
+        arg.replace("${assets_root}",         gameDir + "/assets");
+        arg.replace("${game_assets}",         gameDir + "/assets");
+        arg.replace("${assets_index_name}",   assetsIndex);
+        arg.replace("${auth_uuid}",           offlineUUID);
+        arg.replace("${auth_access_token}",   "0");
+        arg.replace("${auth_session}",        "0");
+        arg.replace("${user_type}",           "legacy");
+        arg.replace("${version_type}",        versionType);
+        arg.replace("${clientid}",            "0");
+        arg.replace("${auth_xuid}",           "0");
+        arg.replace("${user_properties}",     "{}");
+        arg.replace("${natives_directory}",   nativesDir);
+        arg.replace("${library_directory}",   gameDir + "/libraries");
+        arg.replace("${classpath_separator}", sep);
+        arg.replace("${classpath}",           classPath);
+        arg.replace("${launcher_name}",       "yanoml");
+        arg.replace("${launcher_version}",    "1.0");
+        return arg;
+    };
+
+    // ── JVM аргументы ──
+    QStringList jvmArgs;
+    jvmArgs << "-Xms" + QString::number(ramMin) + "G"
+            << "-Xmx" + QString::number(ram)    + "G"
+            << "-Djava.library.path=" + nativesDir
+            << "-Dfile.encoding=UTF-8"
+            << "-Dlog4j2.formatMsgNoLookups=true";
+
+    const QVersionNumber ver = QVersionNumber::fromString(mcVersion);
+
+    if (selectedMajor >= 17)
+    {
+        jvmArgs << "--add-opens=java.base/java.util=ALL-UNNAMED"
+                << "--add-opens=java.base/java.lang=ALL-UNNAMED"
+                << "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED"
+                << "--add-opens=java.base/java.io=ALL-UNNAMED"
+                << "--add-exports=java.base/sun.security.util=ALL-UNNAMED"
+                << "--add-exports=jdk.naming.dns/com.sun.jndi.dns=ALL-UNNAMED";
+    }
+
+    if (ver <= QVersionNumber(1, 12, 2))
+        jvmArgs << "-Djava.net.preferIPv4Stack=true";
+
+    // Доп. JVM-аргументы загрузчика (модульный путь Forge/NeoForge и т.п.).
+    if (childRoot.contains("arguments"))
+    {
+        const QJsonArray jvm = childRoot["arguments"].toObject()["jvm"].toArray();
+        bool skipNext = false;
+        for (const auto& av : jvm)
+        {
+            if (av.isString())
+            {
+                const QString s = av.toString();
+                if (skipNext) { skipNext = false; continue; }
+                if (s == "-cp" || s == "-classpath" || s == "--class-path")
+                {
+                    skipNext = true;
+                    continue;
+                }
+                if (s.contains("${classpath}"))
+                    continue;
+                jvmArgs << replaceVars(s);
+            }
+            else
+            {
+                const QJsonObject o = av.toObject();
+                if (!argRulesAllow(o)) continue;
+                const QJsonValue val = o["value"];
+                if (val.isString())
+                    jvmArgs << replaceVars(val.toString());
+                else
+                    for (const auto& vv : val.toArray())
+                        jvmArgs << replaceVars(vv.toString());
+            }
+        }
+    }
+
+    jvmArgs << "-cp" << classPath << mainClass;
+
+    // ── Game аргументы ──
+    QStringList gameArgs;
+
+    auto appendGameFromRoot = [&](const QJsonObject& root)
+    {
+        if (root.contains("minecraftArguments"))
+        {
+            gameArgs << replaceVars(root["minecraftArguments"].toString())
+                            .split(' ', Qt::SkipEmptyParts);
+        }
+        else if (root.contains("arguments"))
+        {
+            const QJsonArray g = root["arguments"].toObject()["game"].toArray();
+            for (const auto& av : g)
+                if (av.isString())
+                    gameArgs << replaceVars(av.toString());
+        }
+    };
+
+    if (childRoot.contains("minecraftArguments"))
+    {
+        // Legacy Forge: строка уже содержит базовые аргументы + --tweakClass.
+        appendGameFromRoot(childRoot);
+    }
+    else
+    {
+        appendGameFromRoot(parentRoot);
+        if (childRoot.contains("arguments"))
+        {
+            const QJsonArray g =
+                childRoot["arguments"].toObject()["game"].toArray();
+            for (const auto& av : g)
+                if (av.isString())
+                    gameArgs << replaceVars(av.toString());
+        }
+    }
+
+    startMinecraftProcess(javaPath, jvmArgs, gameArgs, gameDir,
+                          versionId, neededJava);
 }
 
 void MainWindow::showCrashDialog(int neededJava, const QString& javaPath)
