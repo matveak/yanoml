@@ -65,9 +65,17 @@ SettingsWindow::SettingsWindow(QWidget* parent)
         }
     });
 
+    // checkStateChanged(Qt::CheckState) появился в Qt 6.7;
+    // для совместимости с Qt 5 используем stateChanged(int).
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
     connect(snapshotsCheckBox, &QCheckBox::checkStateChanged, this, [this](Qt::CheckState) {
         emit settingsChanged();
     });
+#else
+    connect(snapshotsCheckBox, &QCheckBox::stateChanged, this, [this](int) {
+        emit settingsChanged();
+    });
+#endif
 
     // Кнопка сохранения
     QPushButton* closeButton = new QPushButton("Сохранить и закрыть", this);

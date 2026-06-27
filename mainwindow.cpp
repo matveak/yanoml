@@ -22,7 +22,6 @@
 #include <memory>
 #include <QSet>
 #include <QJsonValue>
-#include <private/qzipreader_p.h>
 
 // ==================== Java Auto-Detection ====================
 
@@ -219,6 +218,99 @@ static bool nativeLibraryAllowedOnCurrentOS(const QJsonObject& lib)
     return allowed;
 }
 
+// ── Portable ZIP reader (без private Qt API) ────────────────────────────────
+// JAR — обычный ZIP. Читаем Central Directory в конце файла.
+
+struct ZipEntry { QString name; quint32 localOffset; };
+
+static QVector<ZipEntry> zipCentralDir(QFile& f)
+{
+    QVector<ZipEntry> entries;
+    const qint64 sz = f.size();
+    if (sz < 22) return entries;
+
+    // Ищем EOCD сигнатуру 0x06054b50 с конца файла.
+    const qint64 searchLen = qMin((qint64)65557, sz);
+    f.seek(sz - searchLen);
+    const QByteArray tail = f.read(searchLen);
+
+    int eocd = -1;
+    for (int i = (int)tail.size() - 22; i >= 0; --i)
+    {
+        if ((quint8)tail[i]==0x50 && (quint8)tail[i+1]==0x4b &&
+            (quint8)tail[i+2]==0x05 && (quint8)tail[i+3]==0x06)
+        { eocd = i; break; }
+    }
+    if (eocd < 0) return entries;
+
+    const quint8* e = (const quint8*)tail.constData() + eocd;
+    quint16 num   = e[8]  | (e[9]  << 8);
+    quint32 cdOff = e[16] | (e[17]<<8) | (e[18]<<16) | (e[19]<<24);
+
+    if (!f.seek(cdOff)) return entries;
+
+    for (int i = 0; i < num; ++i)
+    {
+        QByteArray hdr = f.read(46);
+        if (hdr.size() < 46) break;
+        const quint8* h = (const quint8*)hdr.constData();
+        if (h[0]!=0x50||h[1]!=0x4b||h[2]!=0x01||h[3]!=0x02) break;
+
+        quint16 nl  = h[28]|(h[29]<<8);
+        quint16 el  = h[30]|(h[31]<<8);
+        quint16 cl  = h[32]|(h[33]<<8);
+        quint32 off = h[42]|(h[43]<<8)|(h[44]<<16)|(h[45]<<24);
+
+        ZipEntry ze;
+        ze.name        = QString::fromUtf8(f.read(nl));
+        ze.localOffset = off;
+        f.skip(el + cl);
+        entries.append(ze);
+    }
+    return entries;
+}
+
+// Читает данные одного файла из local-заголовка (stored или deflate).
+static QByteArray zipReadEntry(QFile& f, quint32 localOff)
+{
+    if (!f.seek(localOff)) return {};
+    QByteArray lh = f.read(30);
+    if (lh.size() < 30) return {};
+    const quint8* h = (const quint8*)lh.constData();
+    if (h[0]!=0x50||h[1]!=0x4b||h[2]!=0x03||h[3]!=0x04) return {};
+
+    quint16 method   = h[8] |(h[9] <<8);
+    quint32 compSz   = h[18]|(h[19]<<8)|(h[20]<<16)|(h[21]<<24);
+    quint32 uncompSz = h[22]|(h[23]<<8)|(h[24]<<16)|(h[25]<<24);
+    quint16 nl       = h[26]|(h[27]<<8);
+    quint16 el       = h[28]|(h[29]<<8);
+    f.skip(nl + el);
+
+    QByteArray data = f.read(compSz);
+
+    if (method == 0)          // stored
+        return data;
+
+    if (method == 8)          // deflate → оборачиваем в zlib-обёртку для qUncompress
+    {
+        // qUncompress ждёт 4 байта big-endian несжатого размера + zlib-поток
+        QByteArray zlibStream;
+        zlibStream.resize(4);
+        quint8* sz4 = (quint8*)zlibStream.data();
+        sz4[0] = (uncompSz>>24)&0xff; sz4[1] = (uncompSz>>16)&0xff;
+        sz4[2] = (uncompSz>> 8)&0xff; sz4[3] =  uncompSz     &0xff;
+        // zlib-заголовок (CMF=0x78 FLG=0x9C) + raw deflate + adler32 заглушка
+        zlibStream += (char)0x78; zlibStream += (char)0x9C;
+        zlibStream += data;
+        zlibStream += QByteArray(4, '\x00'); // adler32 (игнорируется qUncompress)
+        QByteArray out = qUncompress(zlibStream);
+        return out;
+    }
+
+    qWarning() << "Unsupported ZIP compression method:" << method;
+    return {};
+}
+
 // Распаковывает нативные библиотеки (LWJGL .dll/.so/.dylib) из скачанных
 // classifier-джарников в каталог natives. Без этого шага старые версии
 // (до 1.19, использующие classifiers) падают: java.library.path указывает
@@ -283,48 +375,48 @@ static void extractNativesForVersion(const QJsonObject& root,
         if (excludes.isEmpty())
             excludes << "META-INF/";
 
-        QZipReader zip(jarPath);
-        if (!zip.isReadable())
+        QFile jarFile(jarPath);
+        if (!jarFile.open(QIODevice::ReadOnly))
         {
-            qWarning() << "Cannot read native jar:" << jarPath;
+            qWarning() << "Cannot open native jar:" << jarPath;
             continue;
         }
 
-        const auto entries = zip.fileInfoList();
-        for (const auto& entry : entries)
+        const QVector<ZipEntry> zipEntries = zipCentralDir(jarFile);
+        for (const ZipEntry& ze : zipEntries)
         {
-            if (!entry.isFile)
-                continue;
+            if (ze.name.endsWith('/'))
+                continue; // каталог
 
             bool excluded = false;
             for (const QString& ex : excludes)
-            {
-                if (entry.filePath.startsWith(ex))
-                {
-                    excluded = true;
-                    break;
-                }
-            }
+                if (ze.name.startsWith(ex)) { excluded = true; break; }
             if (excluded)
                 continue;
 
-            // Раскладываем только сами библиотеки в плоскую папку natives.
-            QString outName = QFileInfo(entry.filePath).fileName();
+            // Сохраняем в плоскую папку natives (только имя файла, без пути).
+            QString outName = QFileInfo(ze.name).fileName();
             if (outName.isEmpty())
                 continue;
 
             QString outPath = nativesDir + "/" + outName;
+            if (QFileInfo::exists(outPath))
+                continue; // уже извлечено
+
+            QByteArray data = zipReadEntry(jarFile, ze.localOffset);
+            if (data.isEmpty())
+            {
+                qWarning() << "Failed to decompress native:" << ze.name;
+                continue;
+            }
+
             QFile out(outPath);
             if (out.open(QIODevice::WriteOnly))
-            {
-                out.write(zip.fileData(entry.filePath));
-                out.close();
-            }
+                out.write(data);
             else
-            {
                 qWarning() << "Cannot write native:" << outPath;
-            }
         }
+        jarFile.close();
     }
 }
 
@@ -332,13 +424,14 @@ static void extractNativesForVersion(const QJsonObject& root,
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 {
-    progressBar = new QProgressBar(this);
+    setupUi(this);
+
+    // progressBar создаётся после setupUi — centralwidget уже существует
+    progressBar = new QProgressBar(centralwidget);
     progressBar->setGeometry(QRect(780, 710, 500, 25));
     progressBar->setRange(0, 100);
     progressBar->setValue(0);
     progressBar->hide();
-
-    setupUi(this);
     downloader = new MinecraftDownloader(this);
     settingsWindow = new SettingsWindow(this);
 
@@ -458,7 +551,7 @@ void MainWindow::on_InstallerButton_clicked()
         // Чистая ваниль.
         downloader->createInstance(cleanVersion, "", "", gameDir);
         QMessageBox::information(this, "Установка",
-                                "Начато скачивание " + versionText);
+                                 "Начато скачивание " + versionText);
         return;
     }
 
@@ -467,17 +560,17 @@ void MainWindow::on_InstallerButton_clicked()
 
     auto conn = std::make_shared<QMetaObject::Connection>();
     *conn = connect(downloader, &MinecraftDownloader::instanceCreated, this,
-        [this, conn, loader, cleanVersion, gameDir](const QString&)
-        {
-            disconnect(*conn);
-            startLoaderInstall(loader, cleanVersion, gameDir);
-        });
+                    [this, conn, loader, cleanVersion, gameDir](const QString&)
+                    {
+                        disconnect(*conn);
+                        startLoaderInstall(loader, cleanVersion, gameDir);
+                    });
 
     downloader->createInstance(cleanVersion, "", "", gameDir);
     QMessageBox::information(this, "Установка",
-        "Начато скачивание " + versionText +
-        ".\nПосле базовой версии будет установлен загрузчик "
-        + loader + ".");
+                             "Начато скачивание " + versionText +
+                                 ".\nПосле базовой версии будет установлен загрузчик "
+                                 + loader + ".");
 }
 
 void MainWindow::startLoaderInstall(const QString& loader,
@@ -489,14 +582,14 @@ void MainWindow::startLoaderInstall(const QString& loader,
 
     auto conn = std::make_shared<QMetaObject::Connection>();
     *conn = connect(downloader, &MinecraftDownloader::loaderInstalled, this,
-        [this, conn](const QString& versionId)
-        {
-            disconnect(*conn);
-            m_modLoaderPending = false;
-            progressBar->hide();
-            QMessageBox::information(this, "Готово",
-                "Загрузчик установлен:\n" + versionId);
-        });
+                    [this, conn](const QString& versionId)
+                    {
+                        disconnect(*conn);
+                        m_modLoaderPending = false;
+                        progressBar->hide();
+                        QMessageBox::information(this, "Готово",
+                                                 "Загрузчик установлен:\n" + versionId);
+                    });
 
     if (loader == "fabric")
     {
@@ -506,10 +599,10 @@ void MainWindow::startLoaderInstall(const QString& loader,
     {
         int requiredMajor = requiredJavaMajor(mcVersion);
         ensureJava(requiredMajor, mcVersion, gameDir,
-            [this, loader, mcVersion, gameDir](const QString& javaExe)
-            {
-                downloader->installForgeLike(mcVersion, loader, javaExe, gameDir);
-            });
+                   [this, loader, mcVersion, gameDir](const QString& javaExe)
+                   {
+                       downloader->installForgeLike(mcVersion, loader, javaExe, gameDir);
+                   });
     }
 }
 
@@ -538,8 +631,8 @@ void MainWindow::on_PlayButton_clicked()
         if (versionId.isEmpty())
         {
             QMessageBox::warning(this, "Ошибка",
-                "Загрузчик " + loader + " для " + version +
-                " не установлен.\nНажмите «Установить».");
+                                 "Загрузчик " + loader + " для " + version +
+                                     " не установлен.\nНажмите «Установить».");
             return;
         }
 
@@ -549,7 +642,7 @@ void MainWindow::on_PlayButton_clicked()
         if (!childFile.open(QIODevice::ReadOnly))
         {
             QMessageBox::warning(this, "Ошибка",
-                "Не удалось открыть профиль загрузчика:\n" + childPath);
+                                 "Не удалось открыть профиль загрузчика:\n" + childPath);
             return;
         }
         QJsonObject childRoot =
@@ -565,7 +658,7 @@ void MainWindow::on_PlayButton_clicked()
         if (!parentFile.open(QIODevice::ReadOnly))
         {
             QMessageBox::warning(this, "Ошибка",
-                "Базовая версия " + parentVersion + " не установлена.");
+                                 "Базовая версия " + parentVersion + " не установлена.");
             return;
         }
         QJsonObject parentRoot =
@@ -578,12 +671,12 @@ void MainWindow::on_PlayButton_clicked()
             requiredMajor = requiredJavaMajor(parentVersion);
 
         ensureJava(requiredMajor, parentVersion, gameDir,
-            [this, parentRoot, childRoot, gameDir, parentVersion, versionId,
-             requiredMajor](const QString& javaExe)
-            {
-                launchModded(parentRoot, childRoot, gameDir, parentVersion,
-                             versionId, javaExe, requiredMajor);
-            });
+                   [this, parentRoot, childRoot, gameDir, parentVersion, versionId,
+                    requiredMajor](const QString& javaExe)
+                   {
+                       launchModded(parentRoot, childRoot, gameDir, parentVersion,
+                                    versionId, javaExe, requiredMajor);
+                   });
         return;
     }
 
@@ -619,12 +712,12 @@ void MainWindow::on_PlayButton_clicked()
         requiredMajor = requiredJavaMajor(version);
 
     ensureJava(requiredMajor, version, gameDir,
-        [this, root, gameDir, version, versionDir, mainClass, requiredMajor]
-        (const QString& javaExe)
-        {
-            launchGame(root, gameDir, version, versionDir, mainClass,
-                       javaExe, requiredMajor);
-        });
+               [this, root, gameDir, version, versionDir, mainClass, requiredMajor]
+               (const QString& javaExe)
+               {
+                   launchGame(root, gameDir, version, versionDir, mainClass,
+                              javaExe, requiredMajor);
+               });
 }
 
 // ==================== Java provisioning ====================
@@ -667,19 +760,19 @@ void MainWindow::ensureJava(int requiredMajor,
     progressBar->setValue(0);
     progressBar->show();
     QMessageBox::information(this, "Java",
-        "Нужна Java " + QString::number(requiredMajor) +
-        ".\nСкачиваю официальную Java от Mojang — это разовая операция, "
-        "дождитесь завершения загрузки.");
+                             "Нужна Java " + QString::number(requiredMajor) +
+                                 ".\nСкачиваю официальную Java от Mojang — это разовая операция, "
+                                 "дождитесь завершения загрузки.");
 
     auto conn = std::make_shared<QMetaObject::Connection>();
     *conn = connect(downloader, &MinecraftDownloader::javaRuntimeReady, this,
-        [this, conn, requiredMajor, cb](const QString& javaExe)
-        {
-            disconnect(*conn);
-            progressBar->hide();
-            installedJavas[requiredMajor] = javaExe;
-            cb(javaExe);
-        });
+                    [this, conn, requiredMajor, cb](const QString& javaExe)
+                    {
+                        disconnect(*conn);
+                        progressBar->hide();
+                        installedJavas[requiredMajor] = javaExe;
+                        cb(javaExe);
+                    });
 
     downloader->downloadJavaRuntime(javaComponent, runtimeDir);
 }
@@ -1139,7 +1232,7 @@ void MainWindow::launchModded(const QJsonObject& parentRoot,
         if (root.contains("minecraftArguments"))
         {
             gameArgs << replaceVars(root["minecraftArguments"].toString())
-                            .split(' ', Qt::SkipEmptyParts);
+            .split(' ', Qt::SkipEmptyParts);
         }
         else if (root.contains("arguments"))
         {

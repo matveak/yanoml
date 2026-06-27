@@ -1,4 +1,4 @@
-QT += widgets network networkauth svg gui-private
+QT += widgets network networkauth svg
 
 
 CONFIG += c++17

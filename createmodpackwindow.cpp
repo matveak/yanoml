@@ -146,14 +146,16 @@ void CreateModpackWindow::loadLoaderVersions()
 void CreateModpackWindow::onVersionsLoaded(
     const QVector<MinecraftVersion>& versions)
 {
-    qDebug() << "Loaded versions:";
+    versionBox->clear();
 
     for(const auto& v : versions)
     {
-        qDebug()
-        << v.gameVersion
-        << v.loaderType;
+        // Показываем только release-версии (снапшоты не нужны при создании сборки)
+        if(v.loaderType == "release")
+            versionBox->addItem(v.gameVersion);
     }
+
+    qDebug() << "CreateModpackWindow: loaded" << versionBox->count() << "release versions";
 }
 
 void CreateModpackWindow::onFabricVersions(

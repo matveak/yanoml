@@ -15,6 +15,7 @@
 #include <QComboBox>
 #include <QCheckBox>
 #include <QNetworkReply>
+#include <QSaveFile>
 #include <QMouseEvent>
 #include <QDateTime>
 #include <QSet>
@@ -47,11 +48,11 @@ QString prettyCategory(const QString& slug)
 QString scrollbarStyle()
 {
     return QString(
-        "QScrollBar:vertical { background: transparent; width: 10px; margin: 0; }"
-        "QScrollBar::handle:vertical { background: %1; border-radius: 5px; min-height: 30px; }"
-        "QScrollBar::handle:vertical:hover { background: #4A4F57; }"
-        "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }"
-        "QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }")
+               "QScrollBar:vertical { background: transparent; width: 10px; margin: 0; }"
+               "QScrollBar::handle:vertical { background: %1; border-radius: 5px; min-height: 30px; }"
+               "QScrollBar::handle:vertical:hover { background: #4A4F57; }"
+               "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }"
+               "QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }")
         .arg(kBorder);
 }
 
@@ -108,19 +109,19 @@ ModWindow::ModWindow(QWidget *parent) : QDialog(parent)
     searchEdit->setClearButtonEnabled(true);
     searchEdit->setFixedHeight(42);
     searchEdit->setStyleSheet(QString(
-        "QLineEdit { background-color: %1; border: 1px solid %2; border-radius: 8px;"
-        " padding: 0 12px; color: %3; }"
-        "QLineEdit:focus { border: 1px solid %4; }")
-        .arg(kPanel, kBorder, kText, kAccent));
+                                  "QLineEdit { background-color: %1; border: 1px solid %2; border-radius: 8px;"
+                                  " padding: 0 12px; color: %3; }"
+                                  "QLineEdit:focus { border: 1px solid %4; }")
+                                  .arg(kPanel, kBorder, kText, kAccent));
 
     searchButton = new QPushButton("Поиск", this);
     searchButton->setFixedHeight(42);
     searchButton->setFixedWidth(120);
     searchButton->setCursor(Qt::PointingHandCursor);
     searchButton->setStyleSheet(QString(
-        "QPushButton { background-color: %1; color: #0A0A0A; border-radius: 8px;"
-        " font-weight: bold; }"
-        "QPushButton:hover { background-color: #19c460; }").arg(kAccent));
+                                    "QPushButton { background-color: %1; color: #0A0A0A; border-radius: 8px;"
+                                    " font-weight: bold; }"
+                                    "QPushButton:hover { background-color: #19c460; }").arg(kAccent));
 
     searchLayout->addWidget(searchEdit, 1);
     searchLayout->addWidget(searchButton);
@@ -129,12 +130,12 @@ ModWindow::ModWindow(QWidget *parent) : QDialog(parent)
     // Строка сортировки и количества
     QHBoxLayout* controlsLayout = new QHBoxLayout();
     QString comboStyle = QString(
-        "QComboBox { background-color: %1; border: 1px solid %2; border-radius: 8px;"
-        " padding: 6px 10px; color: %3; }"
-        "QComboBox:hover { border: 1px solid %4; }"
-        "QComboBox QAbstractItemView { background-color: %1; color: %3;"
-        " selection-background-color: %4; selection-color: #0A0A0A; }")
-        .arg(kPanel, kBorder, kText, kAccent);
+                             "QComboBox { background-color: %1; border: 1px solid %2; border-radius: 8px;"
+                             " padding: 6px 10px; color: %3; }"
+                             "QComboBox:hover { border: 1px solid %4; }"
+                             "QComboBox QAbstractItemView { background-color: %1; color: %3;"
+                             " selection-background-color: %4; selection-color: #0A0A0A; }")
+                             .arg(kPanel, kBorder, kText, kAccent);
 
     QLabel* sortLbl = new QLabel("Сортировка:");
     sortLbl->setStyleSheet(QString("color: %1;").arg(kTextDim));
@@ -229,11 +230,11 @@ QWidget* ModWindow::buildSidebar()
     side->setSpacing(10);
 
     const QString rowStyle = QString(
-        "QPushButton { text-align: left; padding: 7px 10px; border: none;"
-        " border-radius: 8px; color: %1; background: transparent; }"
-        "QPushButton:hover { background-color: %2; color: %3; }"
-        "QPushButton:checked { background-color: %4; color: #0A0A0A; font-weight: bold; }")
-        .arg(kTextDim, kPanelHi, kText, kAccent);
+                                 "QPushButton { text-align: left; padding: 7px 10px; border: none;"
+                                 " border-radius: 8px; color: %1; background: transparent; }"
+                                 "QPushButton:hover { background-color: %2; color: %3; }"
+                                 "QPushButton:checked { background-color: %4; color: #0A0A0A; font-weight: bold; }")
+                                 .arg(kTextDim, kPanelHi, kText, kAccent);
 
     // ── Версия игры: поиск + список + «Показать все версии» ─────────────────────
     QWidget* verContent = new QWidget();
@@ -245,9 +246,9 @@ QWidget* ModWindow::buildSidebar()
     versionSearch->setPlaceholderText("Найти версию...");
     versionSearch->setClearButtonEnabled(true);
     versionSearch->setStyleSheet(QString(
-        "QLineEdit { background-color: %1; border: 1px solid %2; border-radius: 8px;"
-        " padding: 6px 10px; color: %3; }"
-        "QLineEdit:focus { border: 1px solid %4; }").arg(kBg, kBorder, kText, kAccent));
+                                     "QLineEdit { background-color: %1; border: 1px solid %2; border-radius: 8px;"
+                                     " padding: 6px 10px; color: %3; }"
+                                     "QLineEdit:focus { border: 1px solid %4; }").arg(kBg, kBorder, kText, kAccent));
     verL->addWidget(versionSearch);
 
     QScrollArea* verScroll = new QScrollArea(verContent);
@@ -268,11 +269,11 @@ QWidget* ModWindow::buildSidebar()
     QCheckBox* showAllChk = new QCheckBox("Показать все версии", verContent);
     showAllChk->setCursor(Qt::PointingHandCursor);
     showAllChk->setStyleSheet(QString(
-        "QCheckBox { color: %1; spacing: 8px; }"
-        "QCheckBox::indicator { width: 16px; height: 16px; border: 1px solid %2;"
-        " border-radius: 4px; background: %3; }"
-        "QCheckBox::indicator:checked { background: %4; border: 1px solid %4; }")
-        .arg(kTextDim, kBorder, kBg, kAccent));
+                                  "QCheckBox { color: %1; spacing: 8px; }"
+                                  "QCheckBox::indicator { width: 16px; height: 16px; border: 1px solid %2;"
+                                  " border-radius: 4px; background: %3; }"
+                                  "QCheckBox::indicator:checked { background: %4; border: 1px solid %4; }")
+                                  .arg(kTextDim, kBorder, kBg, kAccent));
     connect(showAllChk, &QCheckBox::toggled, this, [this](bool on) {
         showAllVersions = on;
         rebuildVersionList();
@@ -345,8 +346,8 @@ QWidget* ModWindow::makeSection(const QString& title, QWidget* content,
     QWidget* container = new QWidget(this);
     container->setObjectName("section");
     container->setStyleSheet(QString(
-        "QWidget#section { background: transparent; border-bottom: 1px solid %1; }")
-        .arg(kBorder));
+                                 "QWidget#section { background: transparent; border-bottom: 1px solid %1; }")
+                                 .arg(kBorder));
 
     QVBoxLayout* v = new QVBoxLayout(container);
     v->setContentsMargins(0, 0, 0, 0);
@@ -482,11 +483,11 @@ void ModWindow::buildCategoryList()
     };
 
     QString itemStyle = QString(
-        "QPushButton { text-align: left; padding: 6px 8px; border: none;"
-        " border-radius: 8px; color: %1; background: transparent; }"
-        "QPushButton:hover { background-color: %2; color: %3; }"
-        "QPushButton:checked { background-color: %4; color: #0A0A0A; font-weight: bold; }")
-        .arg(kTextDim, kPanelHi, kText, kAccent);
+                            "QPushButton { text-align: left; padding: 6px 8px; border: none;"
+                            " border-radius: 8px; color: %1; background: transparent; }"
+                            "QPushButton:hover { background-color: %2; color: %3; }"
+                            "QPushButton:checked { background-color: %4; color: #0A0A0A; font-weight: bold; }")
+                            .arg(kTextDim, kPanelHi, kText, kAccent);
 
     for (const QString& slug : cats)
     {
@@ -523,11 +524,11 @@ void ModWindow::rebuildVersionList()
     versionButtons.clear();
 
     const QString rowStyle = QString(
-        "QPushButton { text-align: left; padding: 6px 10px; border: none;"
-        " border-radius: 8px; color: %1; background: transparent; }"
-        "QPushButton:hover { background-color: %2; color: %3; }"
-        "QPushButton:checked { background-color: %4; color: #0A0A0A; font-weight: bold; }")
-        .arg(kTextDim, kPanelHi, kText, kAccent);
+                                 "QPushButton { text-align: left; padding: 6px 10px; border: none;"
+                                 " border-radius: 8px; color: %1; background: transparent; }"
+                                 "QPushButton:hover { background-color: %2; color: %3; }"
+                                 "QPushButton:checked { background-color: %4; color: #0A0A0A; font-weight: bold; }")
+                                 .arg(kTextDim, kPanelHi, kText, kAccent);
 
     const QString query = versionSearch ? versionSearch->text().trimmed() : QString();
     static const QRegularExpression releaseRe("^[0-9]+\\.[0-9]+(\\.[0-9]+)?$");
@@ -566,11 +567,11 @@ void ModWindow::rebuildLoaderList()
     loaderButtons.clear();
 
     const QString rowStyle = QString(
-        "QPushButton { text-align: left; padding: 7px 10px; border: none;"
-        " border-radius: 8px; color: %1; background: transparent; }"
-        "QPushButton:hover { background-color: %2; color: %3; }"
-        "QPushButton:checked { background-color: %4; color: #0A0A0A; font-weight: bold; }")
-        .arg(kTextDim, kPanelHi, kText, kAccent);
+                                 "QPushButton { text-align: left; padding: 7px 10px; border: none;"
+                                 " border-radius: 8px; color: %1; background: transparent; }"
+                                 "QPushButton:hover { background-color: %2; color: %3; }"
+                                 "QPushButton:checked { background-color: %4; color: #0A0A0A; font-weight: bold; }")
+                                 .arg(kTextDim, kPanelHi, kText, kAccent);
 
     // Имена загрузчиков: из API, иначе — короткий запасной набор.
     QStringList names;
@@ -611,9 +612,9 @@ void ModWindow::rebuildLoaderList()
                            : QString("Показать ещё (%1)").arg(total - limit));
         more->setCursor(Qt::PointingHandCursor);
         more->setStyleSheet(QString(
-            "QPushButton { text-align: left; padding: 6px 10px; border: none;"
-            " background: transparent; color: %1; }"
-            "QPushButton:hover { color: %2; }").arg(kTextDim, kAccent));
+                                "QPushButton { text-align: left; padding: 6px 10px; border: none;"
+                                " background: transparent; color: %1; }"
+                                "QPushButton:hover { color: %2; }").arg(kTextDim, kAccent));
         connect(more, &QPushButton::clicked, this, [this]() {
             showAllLoaders = !showAllLoaders;
             rebuildLoaderList();
@@ -715,7 +716,7 @@ void ModWindow::rebuildActiveFilters()
     const QString loader  = currentLoader();
 
     const bool anyActive = !version.isEmpty() || !loader.isEmpty()
-                         || !selectedCategory.isEmpty() || !selectedEnvironment.isEmpty();
+                           || !selectedCategory.isEmpty() || !selectedEnvironment.isEmpty();
 
     chipsBar->setVisible(anyActive);
     if (!anyActive)
@@ -725,8 +726,8 @@ void ModWindow::rebuildActiveFilters()
     QPushButton* clearAll = new QPushButton("Сбросить фильтры", chipsBar);
     clearAll->setCursor(Qt::PointingHandCursor);
     clearAll->setStyleSheet(QString(
-        "QPushButton { background: transparent; color: %1; border: none; padding: 4px 6px; }"
-        "QPushButton:hover { color: %2; }").arg(kTextDim, kAccent));
+                                "QPushButton { background: transparent; color: %1; border: none; padding: 4px 6px; }"
+                                "QPushButton:hover { color: %2; }").arg(kTextDim, kAccent));
     connect(clearAll, &QPushButton::clicked, this, &ModWindow::clearAllFilters);
     chipsLayout->addWidget(clearAll);
 
@@ -734,10 +735,10 @@ void ModWindow::rebuildActiveFilters()
         QPushButton* chip = new QPushButton("✕  " + text, chipsBar);
         chip->setCursor(Qt::PointingHandCursor);
         chip->setStyleSheet(QString(
-            "QPushButton { background-color: %1; color: %2; border: 1px solid %3;"
-            " border-radius: 12px; padding: 4px 10px; }"
-            "QPushButton:hover { border: 1px solid %4; color: %4; }")
-            .arg(kPanel, kText, kBorder, kAccent));
+                                "QPushButton { background-color: %1; color: %2; border: 1px solid %3;"
+                                " border-radius: 12px; padding: 4px 10px; }"
+                                "QPushButton:hover { border: 1px solid %4; color: %4; }")
+                                .arg(kPanel, kText, kBorder, kAccent));
         connect(chip, &QPushButton::clicked, this, onRemove);
         chipsLayout->addWidget(chip);
     };
@@ -857,8 +858,8 @@ void ModWindow::addModCards(const QVector<Mod>& mods)
         card->setCursor(Qt::PointingHandCursor);
         card->setMinimumHeight(120);
         card->setStyleSheet(QString(
-            "QFrame { background-color: %1; border-radius: 10px; border: 1px solid %2; }"
-            "QFrame:hover { border: 1px solid %3; }").arg(kPanel, kBorder, kAccent));
+                                "QFrame { background-color: %1; border-radius: 10px; border: 1px solid %2; }"
+                                "QFrame:hover { border: 1px solid %3; }").arg(kPanel, kBorder, kAccent));
         card->setProperty("modId", mod.id);
 
         QHBoxLayout* cardLayout = new QHBoxLayout(card);
@@ -910,8 +911,8 @@ void ModWindow::addModCards(const QVector<Mod>& mods)
             {
                 QLabel* tag = new QLabel(prettyCategory(c));
                 tag->setStyleSheet(QString(
-                    "background-color: %1; color: %2; border-radius: 8px;"
-                    " padding: 2px 8px; border: none;").arg(kPanelHi, kTextDim));
+                                       "background-color: %1; color: %2; border-radius: 8px;"
+                                       " padding: 2px 8px; border: none;").arg(kPanelHi, kTextDim));
                 tagsLayout->addWidget(tag);
                 shown++;
             }
@@ -921,8 +922,8 @@ void ModWindow::addModCards(const QVector<Mod>& mods)
         {
             QLabel* more = new QLabel(QString("+%1").arg(hidden));
             more->setStyleSheet(QString(
-                "background-color: %1; color: %2; border-radius: 8px;"
-                " padding: 2px 8px; border: none;").arg(kPanelHi, kTextDim));
+                                    "background-color: %1; color: %2; border-radius: 8px;"
+                                    " padding: 2px 8px; border: none;").arg(kPanelHi, kTextDim));
             tagsLayout->addWidget(more);
         }
         tagsLayout->addStretch(1);
@@ -937,9 +938,9 @@ void ModWindow::addModCards(const QVector<Mod>& mods)
         installBtn->setFixedHeight(38);
         installBtn->setCursor(Qt::PointingHandCursor);
         installBtn->setStyleSheet(QString(
-            "QPushButton { background: transparent; color: %1; border: 1px solid %1;"
-            " border-radius: 8px; font-weight: bold; }"
-            "QPushButton:hover { background-color: %1; color: #0A0A0A; }").arg(kAccent));
+                                      "QPushButton { background: transparent; color: %1; border: 1px solid %1;"
+                                      " border-radius: 8px; font-weight: bold; }"
+                                      "QPushButton:hover { background-color: %1; color: #0A0A0A; }").arg(kAccent));
         connect(installBtn, &QPushButton::clicked, this, [this, mod]() {
             installMod(mod);
         });
@@ -966,7 +967,6 @@ void ModWindow::addModCards(const QVector<Mod>& mods)
         // Клик по карточке открывает страницу мода прямо в лаунчере
         modById.insert(mod.id, mod);
         card->installEventFilter(this);
-        card->setProperty("modName", mod.name);
 
         cardsLayout->addWidget(card);
     }
@@ -1001,21 +1001,41 @@ void ModWindow::onDownloadLinks(const QVector<QUrl>& urls)
     QString savePath = modsPath + "/" + fileName;
 
     QNetworkReply* reply = api->manager.get(QNetworkRequest(url));
-    connect(reply, &QNetworkReply::finished, this, [this, reply, savePath, fileName]() {
+
+    // Используем QSaveFile + readyRead для надёжной записи больших файлов.
+    QSaveFile* saveFile = new QSaveFile(savePath);
+    if (!saveFile->open(QIODevice::WriteOnly)) {
+        QMessageBox::warning(this, "Ошибка", "Не удалось открыть файл для записи:\n" + savePath);
+        saveFile->deleteLater();
         reply->deleteLater();
+        return;
+    }
+
+    connect(reply, &QNetworkReply::readyRead, this, [reply, saveFile]() {
+        saveFile->write(reply->readAll());
+    });
+
+    connect(reply, &QNetworkReply::finished, this, [this, reply, saveFile, fileName]() {
+        // Дочитываем остаток (если readyRead не поймал последний чанк)
+        QByteArray tail = reply->readAll();
+        if (!tail.isEmpty())
+            saveFile->write(tail);
+
+        reply->deleteLater();
+
         if (reply->error() != QNetworkReply::NoError) {
+            saveFile->cancelWriting();
+            saveFile->deleteLater();
             QMessageBox::warning(this, "Ошибка скачивания", reply->errorString());
             return;
         }
 
-        QFile file(savePath);
-        if (file.open(QIODevice::WriteOnly)) {
-            file.write(reply->readAll());
-            file.close();
+        if (saveFile->commit()) {
             QMessageBox::information(this, "Успех", "Мод успешно установлен!\n" + fileName);
         } else {
             QMessageBox::warning(this, "Ошибка", "Не удалось сохранить файл");
         }
+        saveFile->deleteLater();
     });
 }
 
@@ -1023,7 +1043,8 @@ bool ModWindow::eventFilter(QObject* obj, QEvent* event)
 {
     if (event->type() == QEvent::MouseButtonRelease)
     {
-        QMouseEvent* mouseEvent = dynamic_cast<QMouseEvent*>(event);
+        // Тип события уже проверен — static_cast безопасен и быстрее dynamic_cast.
+        QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
         QFrame* card = qobject_cast<QFrame*>(obj);
 
         if (card && mouseEvent)

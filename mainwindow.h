@@ -1,5 +1,4 @@
 #pragma once
-#define MAINWINDOW_H
 
 #include <QMainWindow>
 #include <QComboBox>

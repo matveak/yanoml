@@ -195,12 +195,12 @@ void ModrithAPI::fetchAvailableVersions(const QString& loader)
                 {
                     QJsonParseError err;
                     QJsonDocument doc = QJsonDocument::fromJson(reply->readAll(), &err);
-                    
+
                     if (err.error == QJsonParseError::NoError && doc.isArray())
                     {
                         QJsonArray versions = doc.array();
                         qDebug() << "Получено версий с API:" << versions.size();
-                        
+
                         // Регулярное выражение для Minecraft версий (1.XX, 1.XX.X и т.д.)
                         QRegularExpression mcVersionRegex("^1\\.(\\d+)(\\.(\\d+))?$");
 
@@ -227,14 +227,14 @@ void ModrithAPI::fetchAvailableVersions(const QString& loader)
 
                                 versionsSet.insert(version);
                                 validVersions++;
-                                
+
                                 if (validVersions <= 10)
                                 {
                                     qDebug() << "Добавлена Minecraft версия:" << version;
                                 }
                             }
                         }
-                        
+
                         qDebug() << "Найдено уникальных Minecraft версий:" << versionsSet.size();
                     }
                 }
@@ -247,7 +247,7 @@ void ModrithAPI::fetchAvailableVersions(const QString& loader)
                 if (versionsSet.size() < 5)
                 {
                     qDebug() << "Используется fallback список версий";
-                    
+
                     if (loader == "forge")
                     {
                         versionsSet << "1.21.1" << "1.21" << "1.20.1" << "1.20.2" << "1.20"
@@ -477,8 +477,8 @@ void ModrithAPI::getDownloadLinks(QString slug,
                     qDebug() << "DEBUG: Не найдено ссылок для загрузки. Версия:" << minecraftVersion << "Загрузчик:" << loader;
                     emit OnError("Не найдено подходящей версии мода для:\n"
                                  "Minecraft: " + (minecraftVersion.isEmpty() ? "Любая" : minecraftVersion) + "\n"
-                                 "Загрузчик: " + (loader.isEmpty() ? "Любой" : loader) + "\n\n"
-                                 "Мод может не поддерживать эту комбинацию версии и загрузчика.");
+                                                                                               "Загрузчик: " + (loader.isEmpty() ? "Любой" : loader) + "\n\n"
+                                                                           "Мод может не поддерживать эту комбинацию версии и загрузчика.");
                     return;
                 }
 
@@ -496,7 +496,7 @@ void ModrithAPI::getProject(QString slug)
 
     QNetworkReply* reply = manager.get(req);
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply]()
+    connect(reply, &QNetworkReply::finished, this, [this, reply, slug]()
             {
                 reply->deleteLater();
 
@@ -516,13 +516,16 @@ void ModrithAPI::getProject(QString slug)
                 QJsonObject obj = doc.object();
                 ModProject project;
 
-                project.title = obj["title"].toString();
+                project.title       = obj["title"].toString();
                 project.description = obj["description"].toString();
-                project.body = obj["body"].toString();
-                project.iconUrl = obj["icon_url"].toString();
-                project.license = obj["license"].toObject()["id"].toString();
-                project.downloads = obj["downloads"].toInt();
-                project.updated = obj["date_modified"].toString();
+                project.body        = obj["body"].toString();
+                project.iconUrl     = obj["icon_url"].toString();
+                project.license     = obj["license"].toObject()["id"].toString();
+                project.downloads   = obj["downloads"].toInt();
+                project.updated     = obj["date_modified"].toString();
+                // author приходит не из /project, а из /project/{id}/members —
+                // запрашиваем ниже; пока ставим заглушку.
+                project.author      = QString();
 
                 QJsonArray cats = obj["categories"].toArray();
                 for (const auto& c : cats)
@@ -532,6 +535,46 @@ void ModrithAPI::getProject(QString slug)
                 for (const auto& img : gallery)
                     project.gallery.push_back(img.toObject()["url"].toString());
 
-                emit ProjectReceived(project);
+                // Второй запрос: получаем username автора (owner) из /members.
+                QUrl membersUrl(apiUrl + "/project/" + slug + "/members");
+                QNetworkRequest mreq(membersUrl);
+                mreq.setRawHeader("User-Agent", "MinecraftLauncher/1.0 (Qt)");
+                QNetworkReply* mreply = manager.get(mreq);
+
+                connect(mreply, &QNetworkReply::finished, this,
+                        [this, mreply, project]() mutable
+                        {
+                            mreply->deleteLater();
+
+                            if (mreply->error() == QNetworkReply::NoError)
+                            {
+                                QJsonDocument mdoc =
+                                    QJsonDocument::fromJson(mreply->readAll());
+
+                                if (mdoc.isArray())
+                                {
+                                    for (const auto& mv : mdoc.array())
+                                    {
+                                        QJsonObject mo = mv.toObject();
+                                        if (mo["role"].toString().toLower() == "owner")
+                                        {
+                                            project.author =
+                                                mo["user"].toObject()["username"].toString();
+                                            break;
+                                        }
+                                    }
+                                    // Если owner не найден — берём первого участника
+                                    if (project.author.isEmpty() &&
+                                        !mdoc.array().isEmpty())
+                                    {
+                                        project.author =
+                                            mdoc.array().first().toObject()
+                                                ["user"].toObject()["username"].toString();
+                                    }
+                                }
+                            }
+
+                            emit ProjectReceived(project);
+                        });
             });
 }
