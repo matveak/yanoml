@@ -1,4 +1,5 @@
 #include "settingswindow.h"
+#include "darktheme.h"
 #include <QVBoxLayout>
 #include <QCheckBox>
 #include <QSlider>
@@ -12,7 +13,35 @@ SettingsWindow::SettingsWindow(QWidget* parent)
     : QDialog(parent)
 {
     setWindowTitle("Настройки");
-    resize(450, 380);  // чуть увеличил высоту
+    resize(480, 420);
+    setStyleSheet(DarkTheme::dialogStyle() + R"(
+        QCheckBox { color: #E8EAED; }
+        QCheckBox::indicator {
+            width: 18px; height: 18px;
+            border: 1px solid #3A3E45;
+            border-radius: 4px;
+            background: #26292F;
+        }
+        QCheckBox::indicator:checked {
+            background: #1BD96A;
+            border-color: #1BD96A;
+        }
+        QSlider::groove:horizontal {
+            background: #3A3E45; border-radius: 4px; height: 6px;
+        }
+        QSlider::handle:horizontal {
+            background: #1BD96A; border-radius: 8px;
+            width: 16px; height: 16px; margin: -5px 0;
+        }
+        QSlider::sub-page:horizontal { background: #1BD96A; border-radius: 4px; }
+        QPushButton#saveBtn {
+            background-color: #1BD96A; color: #0A0A0A;
+            border: none; border-radius: 8px;
+            font-weight: bold; font-size: 14px;
+            min-height: 40px;
+        }
+        QPushButton#saveBtn:hover { background-color: #15C25E; }
+    )");
 
     auto* layout = new QVBoxLayout(this);
 
@@ -79,6 +108,7 @@ SettingsWindow::SettingsWindow(QWidget* parent)
 
     // Кнопка сохранения
     QPushButton* closeButton = new QPushButton("Сохранить и закрыть", this);
+    closeButton->setObjectName("saveBtn");
 
     // Добавляем всё в layout
     layout->addWidget(snapshotsCheckBox);

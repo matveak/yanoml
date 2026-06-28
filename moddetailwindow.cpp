@@ -1,4 +1,5 @@
 #include "moddetailwindow.h"
+#include "darktheme.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -15,12 +16,12 @@
 #include <QDebug>
 
 namespace {
-const char* kBg      = "#16181C";
-const char* kPanel   = "#26292F";
-const char* kBorder  = "#3A3E45";
-const char* kText    = "#E8EAED";
-const char* kTextDim = "#9CA3AF";
-const char* kAccent  = "#1BD96A";
+const char* kBg      = DarkTheme::kBg;
+const char* kPanel   = DarkTheme::kPanel;
+const char* kBorder  = DarkTheme::kBorder;
+const char* kText    = DarkTheme::kText;
+const char* kTextDim = DarkTheme::kTextDim;
+const char* kAccent  = DarkTheme::kAccent;
 } // namespace
 
 ModDetailsWindow::ModDetailsWindow(
@@ -30,13 +31,8 @@ ModDetailsWindow::ModDetailsWindow(
     currentMod(mod)
 {
     resize(1000, 750);
-
     setWindowTitle(mod.name);
-    setStyleSheet(QString(
-        "QDialog { background-color: %1; color: %2; }"
-        "QLabel { color: %2; }"
-        "QScrollArea { border: none; background: transparent; }")
-        .arg(kBg, kText));
+    setStyleSheet(DarkTheme::dialogStyle());
 
     api = new ModrithAPI(this);
     manager = new QNetworkAccessManager(this);
@@ -59,8 +55,8 @@ ModDetailsWindow::ModDetailsWindow(
     iconLabel->setFixedSize(128, 128);
     iconLabel->setScaledContents(true);
     iconLabel->setStyleSheet(QString(
-        "border-radius: 12px; border: 1px solid %1; background: %2;")
-        .arg(kBorder, kPanel));
+                                 "border-radius: 12px; border: 1px solid %1; background: %2;")
+                                 .arg(kBorder, kPanel));
 
     QVBoxLayout* infoLayout =
         new QVBoxLayout();
@@ -117,9 +113,9 @@ ModDetailsWindow::ModDetailsWindow(
     descriptionBrowser->setText(
         "Загрузка описания...");
     descriptionBrowser->setStyleSheet(QString(
-        "QTextBrowser { background-color: %1; border: 1px solid %2;"
-        " border-radius: 10px; padding: 12px; color: %3; }")
-        .arg(kPanel, kBorder, kText));
+                                          "QTextBrowser { background-color: %1; border: 1px solid %2;"
+                                          " border-radius: 10px; padding: 12px; color: %3; }")
+                                          .arg(kPanel, kBorder, kText));
 
     // =========================
     // GALLERY
@@ -149,10 +145,10 @@ ModDetailsWindow::ModDetailsWindow(
     installButton->setFixedHeight(44);
     installButton->setCursor(Qt::PointingHandCursor);
     installButton->setStyleSheet(QString(
-        "QPushButton { background-color: %1; color: #0A0A0A; border: none;"
-        " border-radius: 10px; font-weight: bold; font-size: 15px; }"
-        "QPushButton:hover { background-color: #15c25e; }")
-        .arg(kAccent));
+                                     "QPushButton { background-color: %1; color: #0A0A0A; border: none;"
+                                     " border-radius: 10px; font-weight: bold; font-size: 15px; }"
+                                     "QPushButton:hover { background-color: #15c25e; }")
+                                     .arg(kAccent));
 
     connect(installButton, &QPushButton::clicked, this, [this]() {
         emit installRequested(currentMod);

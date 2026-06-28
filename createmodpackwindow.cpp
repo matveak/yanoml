@@ -1,5 +1,6 @@
 #include "createmodpackwindow.h"
 #include "settingswindow.h"
+#include "darktheme.h"
 
 #include <QVBoxLayout>
 #include <QLineEdit>
@@ -15,7 +16,8 @@ CreateModpackWindow::CreateModpackWindow(QWidget* parent)
     : QDialog(parent)
 {
     setWindowTitle("Создание сборки");
-    resize(500, 300);
+    resize(500, 320);
+    setStyleSheet(DarkTheme::dialogStyle());
 
     QVBoxLayout* layout =
         new QVBoxLayout(this);
@@ -62,6 +64,8 @@ CreateModpackWindow::CreateModpackWindow(QWidget* parent)
     createButton =
         new QPushButton(
             "Создать сборку");
+    createButton->setStyleSheet(DarkTheme::accentButton());
+    createButton->setMinimumHeight(40);
 
     layout->addWidget(createButton);
 

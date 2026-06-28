@@ -1,4 +1,6 @@
 #include "mainwindow.h"
+#include "createmodpackwindow.h"
+#include "curseforgewindow.h"
 #include <QMessageBox>
 #include <QDebug>
 #include <QVersionNumber>
@@ -426,12 +428,13 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 {
     setupUi(this);
 
-    // progressBar создаётся после setupUi — centralwidget уже существует
-    progressBar = new QProgressBar(centralwidget);
-    progressBar->setGeometry(QRect(780, 710, 500, 25));
+    // progressBar добавляем в правую панель (над кнопкой В БОЙ)
+    progressBar = new QProgressBar();
     progressBar->setRange(0, 100);
     progressBar->setValue(0);
+    progressBar->setFixedHeight(10);
     progressBar->hide();
+    rightPanelLayout->insertWidget(rightPanelLayout->count() - 1, progressBar);
     downloader = new MinecraftDownloader(this);
     settingsWindow = new SettingsWindow(this);
 
@@ -1521,22 +1524,40 @@ void MainWindow::onNeoForgeVersionReceived(const QString& xml)
 
 void MainWindow::loadVersions()
 {
+    // UpdateBox в новом UI — это комбобокс загрузчика в правой панели
     if (!LoaderBox)
     {
-        LoaderBox = new QComboBox(centralwidget);
-        LoaderBox->setGeometry(QRect(780, 640, 250, 30));
+        LoaderBox = UpdateBox;
+        LoaderBox->clear();
         LoaderBox->addItems({"Vanilla", "Fabric", "Forge", "NeoForge"});
         connect(LoaderBox, &QComboBox::currentTextChanged,
                 this, &MainWindow::onLoaderChanged);
     }
 
-    if (!VersionBox)
-    {
-        VersionBox = new QComboBox(centralwidget);
-        VersionBox->setGeometry(QRect(1050, 640, 250, 30));
-    }
-
     VersionBox->clear();
     VersionBox->addItem("Загрузка версий...");
     downloader->fetchVanillaVersions();
+}
+
+void MainWindow::on_CurseForgeButton_clicked()
+{
+    CurseForgeWindow* w = new CurseForgeWindow(this);
+    w->setAttribute(Qt::WA_DeleteOnClose);
+    w->setSettingsWindow(settingsWindow);
+    w->exec();
+}
+
+void MainWindow::on_ModpackButton_clicked()
+{
+    CreateModpackWindow* w = new CreateModpackWindow(this);
+    w->setAttribute(Qt::WA_DeleteOnClose);
+    w->setSettingsWindow(settingsWindow);
+    MinecraftDownloader* dlForModpack = new MinecraftDownloader(w);
+    w->setDownloader(dlForModpack);
+    connect(dlForModpack, &MinecraftDownloader::instanceCreated, this,
+            [this](const QString& path) {
+                QMessageBox::information(this, "Сборка создана",
+                                         "Сборка успешно создана:\n" + path);
+            });
+    w->exec();
 }

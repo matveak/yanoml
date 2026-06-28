@@ -1,14 +1,11 @@
 QT += widgets network networkauth svg
 
-
 CONFIG += c++17
-
-# You can make your code fail to compile if it uses deprecated APIs.
-# In order to do so, uncomment the following line.
-#DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
     createmodpackwindow.cpp \
+    curseforgeclient.cpp \
+    curseforgewindow.cpp \
     main.cpp \
     mainwindow.cpp \
     minecraftdownloader.cpp \
@@ -19,6 +16,9 @@ SOURCES += \
 
 HEADERS += \
     createmodpackwindow.h \
+    curseforgeclient.h \
+    curseforgewindow.h \
+    darktheme.h \
     mainwindow.h \
     minecraftdownloader.h \
     moddetailwindow.h \
@@ -26,9 +26,6 @@ HEADERS += \
     modwindow.h \
     settingswindow.h \
     ui_mainwindow.h
-
-FORMS += \
-    mainwindow.ui
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
