@@ -89,6 +89,6 @@ private:
     QNetworkAccessManager m_nam;
     // Публичный CF API key (proxy key от CFWidget — без него работает для чтения)
     // Если у вас есть свой ключ — замените.
-    const QString m_apiKey = "$2a$10$bL4bIL5pUWqfcO7KwQnL.eMRWn.VH7mXIv0Cl5mDHJd3jkFMlnACa";
+    const QString m_apiKey = "$2a$10$HY0vVz3lE0tURUI5QFDCNeWrbnjS3MMAKX3NHlOJmubSZKNGv4Cai";
     const QString m_base   = "https://api.curseforge.com/v1";
 };

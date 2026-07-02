@@ -5,6 +5,7 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QCryptographicHash>
+#include <QTimer>
 #include <QProcess>
 
 MinecraftDownloader::MinecraftDownloader(QObject* parent)
@@ -192,42 +193,74 @@ void MinecraftDownloader::fetchNeoForgeVersions()
 
 // ==================== DOWNLOAD FILE ====================
 
-void MinecraftDownloader::downloadFile(const QUrl& url, const QString& outputPath)
+void MinecraftDownloader::downloadFile(const QUrl& url,
+                                       const QString& outputPath)
 {
-    // Skip if already downloaded
     if (QFileInfo::exists(outputPath))
     {
         emit fileDownloaded(outputPath);
         return;
     }
 
-    QDir().mkpath(QFileInfo(outputPath).path());
+    downloadQueue.enqueue({url, outputPath});
+    startNextDownload();
+}
 
-    QNetworkReply* reply = manager.get(QNetworkRequest(url));
-    QSaveFile* file = new QSaveFile(outputPath);
+void MinecraftDownloader::startNextDownload()
+{
+    while (activeDownloads < MaxParallelDownloads &&
+           !downloadQueue.isEmpty())
+    {
+        DownloadTask task = downloadQueue.dequeue();
+        startDownload(task);
+    }
+}
+
+void MinecraftDownloader::startDownload(const DownloadTask& task)
+{
+    QDir().mkpath(QFileInfo(task.outputPath).path());
+
+    QNetworkReply* reply =
+        manager.get(QNetworkRequest(task.url));
+
+    QSaveFile* file = new QSaveFile(task.outputPath);
 
     if (!file->open(QIODevice::WriteOnly))
     {
-        emit errorOccurred("Не удалось открыть файл для записи: " + outputPath);
+        emit errorOccurred(
+            "Не удалось открыть файл для записи: " +
+            task.outputPath);
+
         file->deleteLater();
         reply->deleteLater();
+
+        startNextDownload();
         return;
     }
 
-    connect(reply, &QNetworkReply::readyRead, this, [reply, file]()
+    ++activeDownloads;
+
+    connect(reply,
+            &QNetworkReply::readyRead,
+            this,
+            [reply, file]()
             {
                 file->write(reply->readAll());
             });
 
-    connect(reply, &QNetworkReply::downloadProgress,
-            this, &MinecraftDownloader::downloadProgress);
+    connect(reply,
+            &QNetworkReply::downloadProgress,
+            this,
+            &MinecraftDownloader::downloadProgress);
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply, file, outputPath]()
+    connect(reply,
+            &QNetworkReply::finished,
+            this,
+            [this, reply, file, task]()
             {
-                // Flush any remaining bytes (readyRead may not have caught the last chunk)
-                QByteArray remaining = reply->readAll();
-                if (!remaining.isEmpty())
-                    file->write(remaining);
+                QByteArray tail = reply->readAll();
+                if (!tail.isEmpty())
+                    file->write(tail);
 
                 if (reply->error() != QNetworkReply::NoError)
                 {
@@ -237,11 +270,15 @@ void MinecraftDownloader::downloadFile(const QUrl& url, const QString& outputPat
                 else
                 {
                     file->commit();
-                    emit fileDownloaded(outputPath);
+                    emit fileDownloaded(task.outputPath);
                 }
 
                 file->deleteLater();
                 reply->deleteLater();
+
+                --activeDownloads;
+
+                startNextDownload();
             });
 }
 
@@ -259,7 +296,7 @@ void MinecraftDownloader::downloadVanillaVersion(
 
                 if (reply->error() != QNetworkReply::NoError)
                 {
-                    emit errorOccurred(reply->errorString());
+                    qDebug() << reply->errorString();
                     return;
                 }
 
@@ -414,6 +451,7 @@ void MinecraftDownloader::createInstance(
 
                                     if (!url.isEmpty() && !path.isEmpty())
                                     {
+
                                         QString fullPath = librariesDir + "/" + path;
                                         QDir().mkpath(QFileInfo(fullPath).path());
                                         ++totalFiles;
@@ -644,6 +682,15 @@ void MinecraftDownloader::downloadAssetObject(const QUrl& url,
                 bool    hashOk  = expectedHash.isEmpty() || (gotHash == expectedHash);
 
                 delete sha1;
+                if (!netOk)
+                {
+                    qDebug() << reply->error() << reply->errorString();
+                }
+
+                if (netOk && !hashOk)
+                {
+                    qDebug() << "SHA1 mismatch";
+                }
                 reply->deleteLater();
 
                 if (netOk && hashOk)
@@ -654,14 +701,26 @@ void MinecraftDownloader::downloadAssetObject(const QUrl& url,
                     return;
                 }
 
+
+
                 // Не оставляем битый файл на диске.
                 file->cancelWriting();
                 file->deleteLater();
 
-                if (attempt < 2)
+                if (attempt < 10)
                 {
-                    downloadAssetObject(url, outputPath, expectedHash,
-                                        downloaded, total, instancePath, attempt + 1);
+                    QTimer::singleShot(1000 * (attempt + 1), this,
+                        [=]
+                        {
+                            qDebug() << "Ошибка при установки файла \"" + outputPath + "\". Попытка " + QString::fromStdString(std::to_string(attempt)) + "/10";
+                            downloadAssetObject(url,
+                                                outputPath,
+                                                expectedHash,
+                                                downloaded,
+                                                total,
+                                                instancePath,
+                                                attempt + 1);
+                        });
                     return;
                 }
 
@@ -1297,7 +1356,12 @@ void MinecraftDownloader::runLoaderInstaller(const QUrl& installerUrl,
                         return;
                     }
 
-                    emit loaderInstalled(id);
+                    const QString versionJson = gameDir + "/versions/" + id + "/" + id + ".json";
+                    qDebug() << "downloading libraries";
+                    downloadLibrariesFromVersionJson(versionJson, gameDir, [=]
+                    {
+                        emit loaderInstalled(id);
+                    });
                 });
 
         proc->start(javaExe, { "-jar", installerPath,
@@ -1356,4 +1420,150 @@ void MinecraftDownloader::runLoaderInstaller(const QUrl& installerUrl,
 
                 runProc();
             });
+}
+
+void MinecraftDownloader::downloadLibrariesFromVersionJson(
+    const QString& versionJsonPath,
+    const QString& gameDir,
+    std::function<void()> onFinished)
+{
+    QFile file(versionJsonPath);
+
+    if (!file.open(QIODevice::ReadOnly))
+    {
+        emit errorOccurred("Не удалось открыть " + versionJsonPath);
+        return;
+    }
+
+    const QJsonObject root =
+        QJsonDocument::fromJson(file.readAll()).object();
+
+    file.close();
+
+    struct Item
+    {
+        QUrl url;
+        QString path;
+    };
+
+    QVector<Item> items;
+
+    const QString librariesDir = gameDir + "/libraries";
+
+    const QJsonArray libraries = root["libraries"].toArray();
+
+    for (const auto& value : libraries)
+    {
+        const QJsonObject lib = value.toObject();
+
+        if (!libraryAllowedOnCurrentOS(lib))
+            continue;
+
+        const QJsonObject downloads = lib["downloads"].toObject();
+
+        //
+        // обычная библиотека
+        //
+        if (downloads.contains("artifact"))
+        {
+            const QJsonObject artifact =
+                downloads["artifact"].toObject();
+
+            const QString url  = artifact["url"].toString();
+            const QString path = artifact["path"].toString();
+
+            if (!url.isEmpty() && !path.isEmpty())
+            {
+                items.push_back({
+                    QUrl(url),
+                    librariesDir + "/" + path
+                });
+            }
+        }
+
+        //
+        // natives
+        //
+        if (downloads.contains("classifiers"))
+        {
+            const QJsonObject classifiers =
+                downloads["classifiers"].toObject();
+
+            QString nativeKey;
+
+#ifdef Q_OS_WIN
+            if (classifiers.contains("natives-windows"))
+                nativeKey = "natives-windows";
+            else if (classifiers.contains("natives-windows-64"))
+                nativeKey = "natives-windows-64";
+#elif defined(Q_OS_MAC)
+            if (classifiers.contains("natives-osx"))
+                nativeKey = "natives-osx";
+            else if (classifiers.contains("natives-macos"))
+                nativeKey = "natives-macos";
+#else
+            if (classifiers.contains("natives-linux"))
+                nativeKey = "natives-linux";
+#endif
+
+            if (!nativeKey.isEmpty())
+            {
+                const QJsonObject native =
+                    classifiers[nativeKey].toObject();
+
+                const QString url  = native["url"].toString();
+                const QString path = native["path"].toString();
+
+                if (!url.isEmpty() && !path.isEmpty())
+                {
+                    items.push_back({
+                        QUrl(url),
+                        librariesDir + "/" + path
+                    });
+                }
+            }
+        }
+    }
+
+    if (items.isEmpty())
+    {
+        if (onFinished)
+            onFinished();
+        return;
+    }
+
+    auto remaining = std::make_shared<int>(items.size());
+
+    qDebug() << "amount of items to be installed:" << items.size();
+
+    for (const Item& item : items)
+    {
+        if (QFileInfo::exists(item.path))
+        {
+            qDebug() << "file" << item.path << "already exists";
+            if (--(*remaining) == 0 && onFinished) {
+                onFinished();
+            }
+            continue;
+        }
+
+        connect(this,
+                &MinecraftDownloader::fileDownloaded,
+                this,
+                [this, remaining, item, onFinished](const QString& path)
+                {
+                    if (path != item.path)
+                        return;
+
+                    disconnect(this, nullptr, this, nullptr);
+
+                    if (--(*remaining) == 0 && onFinished) {
+                        qDebug() << "file" << item.path << "downloaded";
+                        onFinished();
+                    }
+                },
+                Qt::SingleShotConnection);
+        qDebug() << "downloading file " << item.path;
+        downloadFile(item.url, item.path);
+    }
 }

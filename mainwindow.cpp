@@ -362,6 +362,7 @@ static void extractNativesForVersion(const QJsonObject& root,
             continue;
 
         QString jarPath = gameDir + "/libraries/" + relPath;
+        qDebug() << "Checking native:" << jarPath;
         if (!QFileInfo::exists(jarPath))
         {
             qWarning() << "Native jar not found, skipping:" << jarPath;
@@ -406,6 +407,7 @@ static void extractNativesForVersion(const QJsonObject& root,
                 continue; // уже извлечено
 
             QByteArray data = zipReadEntry(jarFile, ze.localOffset);
+            qDebug() << "Extract:" << ze.name << "from" << jarPath;
             if (data.isEmpty())
             {
                 qWarning() << "Failed to decompress native:" << ze.name;

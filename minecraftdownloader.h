@@ -8,6 +8,7 @@
 #include <QFile>
 #include <QSaveFile>
 #include <QVector>
+#include <QQueue>
 
 struct MinecraftVersion
 {
@@ -103,4 +104,18 @@ private:
     void runLoaderInstaller(const QUrl& installerUrl, const QString& mcVersion,
                             const QString& loader, const QString& javaExe,
                             const QString& gameDir);
+    struct DownloadTask
+    {
+        QUrl url;
+        QString outputPath;
+    };
+
+    QQueue<DownloadTask> downloadQueue;
+    int activeDownloads = 0;
+
+    static constexpr int MaxParallelDownloads = 6;
+
+    void startNextDownload();
+    void startDownload(const DownloadTask& task);
+    void downloadLibrariesFromVersionJson(const QString& versionJsonPath, const QString& gameDir, std::function<void()> onFinished);
 };
