@@ -220,6 +220,8 @@ static bool nativeLibraryAllowedOnCurrentOS(const QJsonObject& lib)
     return allowed;
 }
 
+//TODO: use ArchiveReader(Zip/Jar one)
+
 // ── Portable ZIP reader (без private Qt API) ────────────────────────────────
 // JAR — обычный ZIP. Читаем Central Directory в конце файла.
 
