@@ -11,6 +11,7 @@
 
 
 class Downloader : public QObject {
+protected:
 	struct DownloadTask
 	{
 		QUrl url;
@@ -23,7 +24,8 @@ class Downloader : public QObject {
 
 	static constexpr int MaxParallelDownloads = 6;
 
-	Downloader Downloader();
+public:
+	Downloader();
 
 	void startNextDownload();
 
