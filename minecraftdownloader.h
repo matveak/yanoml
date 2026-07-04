@@ -9,6 +9,7 @@
 #include <QSaveFile>
 #include <QVector>
 #include <QQueue>
+#include "downloading/downloader.h"
 
 struct MinecraftVersion
 {
@@ -32,7 +33,6 @@ public:
     void fetchForgeVersions();
     void fetchNeoForgeVersions();
 
-    void downloadFile(const QUrl& url, const QString& outputPath);
     void downloadVanillaVersion(const QString& versionJsonUrl, const QString& outputJarPath);
     void createInstance(const QString& minecraftVersion, const QString& modLoader, const QString& modLoaderVersion, const QString& instancePath);
 
@@ -77,7 +77,7 @@ signals:
     // Загрузчик (Fabric/Forge/NeoForge) установлен; versionId — id версии.
     void loaderInstalled(const QString& versionId);
 private:
-    QNetworkAccessManager manager;
+
     int totalFiles = 0;
     int completedFiles = 0;
     void handleVanillaManifest(QNetworkReply* reply);
@@ -104,18 +104,5 @@ private:
     void runLoaderInstaller(const QUrl& installerUrl, const QString& mcVersion,
                             const QString& loader, const QString& javaExe,
                             const QString& gameDir);
-    struct DownloadTask
-    {
-        QUrl url;
-        QString outputPath;
-    };
-
-    QQueue<DownloadTask> downloadQueue;
-    int activeDownloads = 0;
-
-    static constexpr int MaxParallelDownloads = 6;
-
-    void startNextDownload();
-    void startDownload(const DownloadTask& task);
-    void downloadLibrariesFromVersionJson(const QString& versionJsonPath, const QString& gameDir, std::function<void()> onFinished);
+    Downloader d;
 };
