@@ -8,72 +8,13 @@
 #include <QTimer>
 #include <QProcess>
 
-MinecraftDownloader::MinecraftDownloader(QObject* parent)
-    : QObject(parent)
+MinecraftDownloader::MinecraftDownloader(QObject* parent) : d{new QNetworkAccessManager(parent), parent}
 {
-
 }
 
 // ==================== HELPERS ====================
 
-static bool libraryAllowedOnCurrentOS(const QJsonObject& lib)
-{
-    QJsonArray rules = lib["rules"].toArray();
-    if (rules.isEmpty())
-        return true;
-
-    bool allowed = false;
-
-    for (const auto& ruleVal : rules)
-    {
-        QJsonObject rule = ruleVal.toObject();
-        QString action  = rule["action"].toString();
-
-        if (rule.contains("os"))
-        {
-            QString osName = rule["os"].toObject()["name"].toString();
-
-#ifdef Q_OS_WIN
-            QString currentOS = "windows";
-#elif defined(Q_OS_MAC)
-            QString currentOS = "osx";
-#else
-            QString currentOS = "linux";
-#endif
-            if (osName == currentOS)
-                allowed = (action == "allow");
-        }
-        else
-        {
-            allowed = (action == "allow");
-        }
-    }
-
-    return allowed;
-}
-
 // ==================== VANILLA ====================
-
-void MinecraftDownloader::fetchVanillaVersions()
-{
-    qDebug() << "Requesting versions...";
-
-    QUrl url("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json");
-    QNetworkReply* reply = manager.get(QNetworkRequest(url));
-
-    connect(reply, &QNetworkReply::finished, this, [this, reply]()
-            {
-                reply->deleteLater();
-
-                if (reply->error() != QNetworkReply::NoError)
-                {
-                    emit errorOccurred(reply->errorString());
-                    return;
-                }
-
-                handleVanillaManifest(reply);
-            });
-}
 
 void MinecraftDownloader::handleVanillaManifest(QNetworkReply* reply)
 {
@@ -110,86 +51,6 @@ void MinecraftDownloader::handleVanillaManifest(QNetworkReply* reply)
 
 // ==================== FABRIC ====================
 
-void MinecraftDownloader::fetchFabricVersions()
-{
-    qDebug() << "Request Fabric versions";
-
-    QNetworkReply* reply = manager.get(
-        QNetworkRequest(QUrl("https://meta.fabricmc.net/v2/versions/game")));
-
-    connect(reply, &QNetworkReply::finished, this, [this, reply]()
-            {
-                QByteArray data = reply->readAll();
-                reply->deleteLater();
-
-                if (reply->error() != QNetworkReply::NoError)
-                {
-                    emit errorOccurred(reply->errorString());
-                    return;
-                }
-
-                QJsonDocument doc = QJsonDocument::fromJson(data);
-
-                if (!doc.isArray())
-                {
-                    emit errorOccurred("Fabric API returned invalid JSON");
-                    return;
-                }
-
-                emit fabricVersionsReceived(doc.array());
-            });
-}
-
-// ==================== FORGE ====================
-
-void MinecraftDownloader::fetchForgeVersions()
-{
-    qDebug() << "Request Forge versions";
-
-    QUrl url("https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json");
-    QNetworkReply* reply = manager.get(QNetworkRequest(url));
-
-    connect(reply, &QNetworkReply::finished, this, [this, reply]()
-            {
-                reply->deleteLater();
-
-                qDebug() << "Forge finished" << reply->errorString();
-
-                if (reply->error() != QNetworkReply::NoError)
-                {
-                    emit errorOccurred(reply->errorString());
-                    return;
-                }
-
-                emit forgeVersionsReceived(
-                    QJsonDocument::fromJson(reply->readAll()).object());
-            });
-}
-
-// ==================== NEOFORGE ====================
-
-void MinecraftDownloader::fetchNeoForgeVersions()
-{
-    qDebug() << "Request NeoForge versions";
-
-    QUrl url("https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml");
-    QNetworkReply* reply = manager.get(QNetworkRequest(url));
-
-    connect(reply, &QNetworkReply::finished, this, [this, reply]()
-            {
-                reply->deleteLater();
-
-                qDebug() << "NeoForge finished" << reply->errorString();
-
-                if (reply->error() != QNetworkReply::NoError)
-                {
-                    emit errorOccurred(reply->errorString());
-                    return;
-                }
-
-                emit neoforgeVersionReceived(QString(reply->readAll()));
-            });
-}
 
 // ==================== DOWNLOAD FILE ====================
 
@@ -771,7 +632,7 @@ void MinecraftDownloader::runLoaderInstaller(const QUrl& installerUrl,
 
                     const QString versionJson = gameDir + "/versions/" + id + "/" + id + ".json";
                     qDebug() << "downloading libraries";
-                    downloadLibrariesFromVersionJson(versionJson, gameDir, [=]
+                    d.downloadLibrariesFromVersionJson(versionJson, gameDir, [=]
                     {
                         emit loaderInstalled(id);
                     });
@@ -833,150 +694,4 @@ void MinecraftDownloader::runLoaderInstaller(const QUrl& installerUrl,
 
                 runProc();
             });
-}
-
-void MinecraftDownloader::downloadLibrariesFromVersionJson(
-    const QString& versionJsonPath,
-    const QString& gameDir,
-    std::function<void()> onFinished)
-{
-    QFile file(versionJsonPath);
-
-    if (!file.open(QIODevice::ReadOnly))
-    {
-        emit errorOccurred("Не удалось открыть " + versionJsonPath);
-        return;
-    }
-
-    const QJsonObject root =
-        QJsonDocument::fromJson(file.readAll()).object();
-
-    file.close();
-
-    struct Item
-    {
-        QUrl url;
-        QString path;
-    };
-
-    QVector<Item> items;
-
-    const QString librariesDir = gameDir + "/libraries";
-
-    const QJsonArray libraries = root["libraries"].toArray();
-
-    for (const auto& value : libraries)
-    {
-        const QJsonObject lib = value.toObject();
-
-        if (!libraryAllowedOnCurrentOS(lib))
-            continue;
-
-        const QJsonObject downloads = lib["downloads"].toObject();
-
-        //
-        // обычная библиотека
-        //
-        if (downloads.contains("artifact"))
-        {
-            const QJsonObject artifact =
-                downloads["artifact"].toObject();
-
-            const QString url  = artifact["url"].toString();
-            const QString path = artifact["path"].toString();
-
-            if (!url.isEmpty() && !path.isEmpty())
-            {
-                items.push_back({
-                    QUrl(url),
-                    librariesDir + "/" + path
-                });
-            }
-        }
-
-        //
-        // natives
-        //
-        if (downloads.contains("classifiers"))
-        {
-            const QJsonObject classifiers =
-                downloads["classifiers"].toObject();
-
-            QString nativeKey;
-
-#ifdef Q_OS_WIN
-            if (classifiers.contains("natives-windows"))
-                nativeKey = "natives-windows";
-            else if (classifiers.contains("natives-windows-64"))
-                nativeKey = "natives-windows-64";
-#elif defined(Q_OS_MAC)
-            if (classifiers.contains("natives-osx"))
-                nativeKey = "natives-osx";
-            else if (classifiers.contains("natives-macos"))
-                nativeKey = "natives-macos";
-#else
-            if (classifiers.contains("natives-linux"))
-                nativeKey = "natives-linux";
-#endif
-
-            if (!nativeKey.isEmpty())
-            {
-                const QJsonObject native =
-                    classifiers[nativeKey].toObject();
-
-                const QString url  = native["url"].toString();
-                const QString path = native["path"].toString();
-
-                if (!url.isEmpty() && !path.isEmpty())
-                {
-                    items.push_back({
-                        QUrl(url),
-                        librariesDir + "/" + path
-                    });
-                }
-            }
-        }
-    }
-
-    if (items.isEmpty())
-    {
-        if (onFinished)
-            onFinished();
-        return;
-    }
-
-    auto remaining = std::make_shared<int>(items.size());
-
-    qDebug() << "amount of items to be installed:" << items.size();
-
-    for (const Item& item : items)
-    {
-        if (QFileInfo::exists(item.path))
-        {
-            qDebug() << "file" << item.path << "already exists";
-            if (--(*remaining) == 0 && onFinished) {
-                onFinished();
-            }
-            continue;
-        }
-
-        connect(this,
-                &MinecraftDownloader::fileDownloaded,
-                this,
-                [this, remaining, item, onFinished](const QString& path)
-                {
-                    if (path != item.path)
-                        return;
-
-                    disconnect(this, nullptr, this, nullptr);
-
-                    if (--(*remaining) == 0 && onFinished) {
-                        qDebug() << "file" << item.path << "downloaded";
-                        onFinished();
-                    }
-                },
-                Qt::SingleShotConnection);
-        qDebug() << "downloading file " << item.path;
-        d.downloadFile(item.url, item.path);
-    }
 }

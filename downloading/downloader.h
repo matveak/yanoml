@@ -20,12 +20,12 @@ protected:
 
 	QQueue<DownloadTask> downloadQueue;
 	int activeDownloads = 0;
-	QNetworkAccessManager manager;
+	QNetworkAccessManager *manager;
 
 	static constexpr int MaxParallelDownloads = 6;
 
 public:
-	Downloader();
+	Downloader(QNetworkAccessManager *manager, QObject *parent = nullptr);
 
 	void startNextDownload();
 

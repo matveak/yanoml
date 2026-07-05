@@ -28,11 +28,6 @@ class MinecraftDownloader : public QObject
 public:
     explicit MinecraftDownloader(QObject* parent = nullptr);
 
-    void fetchVanillaVersions();
-    void fetchFabricVersions();
-    void fetchForgeVersions();
-    void fetchNeoForgeVersions();
-
     void downloadVanillaVersion(const QString& versionJsonUrl, const QString& outputJarPath);
     void createInstance(const QString& minecraftVersion, const QString& modLoader, const QString& modLoaderVersion, const QString& instancePath);
 

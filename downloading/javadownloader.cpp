@@ -12,8 +12,7 @@
 // ==================== JAVA RUNTIME ====================
 
 void JavaDownloader::downloadJavaRuntime(const QString& component,
-                                              const QString& outputDir)
-{
+                                              const QString& outputDir) {
 #if defined(Q_OS_WIN)
 #  if defined(Q_PROCESSOR_ARM)
     const QString platformKey = "windows-arm64";
@@ -41,7 +40,7 @@ void JavaDownloader::downloadJavaRuntime(const QString& component,
         "https://launchermeta.mojang.com/v1/products/java-runtime/"
         "2ec0cc96c44e5a76b9c8b7c39df7210883d12871/all.json";
 
-    QNetworkReply* allReply = manager.get(QNetworkRequest(QUrl(allUrl)));
+    QNetworkReply* allReply = manager->get(QNetworkRequest(QUrl(allUrl)));
 
     connect(allReply, &QNetworkReply::finished, this,
             [this, allReply, platformKey, component, outputDir]()
@@ -78,7 +77,7 @@ void JavaDownloader::downloadJavaRuntime(const QString& component,
 
                 // ── Manifest со списком файлов runtime ───────────────────────
                 QNetworkReply* manReply =
-                    manager.get(QNetworkRequest(QUrl(manifestUrl)));
+                    manager->get(QNetworkRequest(QUrl(manifestUrl)));
 
                 connect(manReply, &QNetworkReply::finished, this,
                         [this, manReply, outputDir]()
@@ -161,7 +160,7 @@ void JavaDownloader::downloadJavaRuntime(const QString& component,
                                 }
 
                                 QNetworkReply* fileReply =
-                                    manager.get(QNetworkRequest(QUrl(item.url)));
+                                    manager->get(QNetworkRequest(QUrl(item.url)));
                                 QFile* f = new QFile(item.path);
 
                                 if (!f->open(QIODevice::WriteOnly))
