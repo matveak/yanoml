@@ -48,21 +48,12 @@ private:
     MinecraftDownloader* downloader       = nullptr;
     MinecraftLauncher*   launcher         = nullptr;
     QComboBox*           LoaderBox        = nullptr;
-    QMap<int, QString>   installedJavas;
     bool                 m_modLoaderPending = false;
 
     void setupConnections();
     void setupTrayIcon();
     void loadVersions();
     void showCrashDialog(int neededJava, const QString& javaPath);
-
-    void launchModded(const QJsonObject& parentRoot,
-                      const QJsonObject& childRoot,
-                      const QString& gameDir,
-                      const QString& mcVersion,
-                      const QString& versionId,
-                      const QString& javaPath,
-                      int neededJava);
 
     void startLoaderInstall(const QString& loader,
                             const QString& mcVersion,

@@ -19,11 +19,11 @@ public:
 
 	QString getCrashHint(int neededJava, QString javaPath) const;
 
-	void ensureJava(int requiredMajor, const QString &mcVersion, const QString &gameDir,
-	                std::function<void(QString)> cb);
+	void ensureJava(const QString &mcVersion, const QString &gameDir,
+	                std::function<void(QString)> cb, QString javaPath);
 
 	void launchGame(const QJsonObject &root, const QString &gameDir, const QString &version, const QString &versionDir,
-	                const QString &mainClass, const QString &javaPath, const QString &username, int ram,
+	                const QString &mainClass, const QString &javaPath, QString username, int ram,
 	                int neededJava);
 
 	void launchModded(const QJsonObject &parentRoot, const QJsonObject &childRoot, const QString &gameDir,
@@ -37,6 +37,7 @@ public:
 private:
 	QProcess *minecraftProcess = nullptr;
 	MinecraftDownloader *downloader = nullptr;
+	QMap<int, QString>   installedJavas;
 };
 
 #endif //MINECRAFTLAUNCHER_H

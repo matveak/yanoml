@@ -221,12 +221,12 @@ void MainWindow::startLoaderInstall(const QString& loader,
     }
     else // forge / neoforge — нужен Java для запуска установщика
     {
-        int requiredMajor = requiredJavaMajor(mcVersion);
-        launcher->ensureJava(requiredMajor, mcVersion, gameDir,
-                   [this, loader, mcVersion, gameDir](const QString& javaExe)
-                   {
-                       downloader->installForgeLike(mcVersion, loader, javaExe, gameDir);
-                   });
+        launcher->ensureJava(mcVersion, gameDir,
+                             [this, loader, mcVersion, gameDir](const QString& javaExe)
+                             {
+                                 progressBar->hide();
+                                 downloader->installForgeLike(mcVersion, loader, javaExe, gameDir);
+                             }, settingsWindow->javaPath());
     }
 }
 
@@ -289,18 +289,15 @@ void MainWindow::on_PlayButton_clicked()
             QJsonDocument::fromJson(parentFile.readAll()).object();
         parentFile.close();
 
-        int requiredMajor =
-            parentRoot["javaVersion"].toObject()["majorVersion"].toInt();
-        if (requiredMajor <= 0)
-            requiredMajor = requiredJavaMajor(parentVersion);
-
-        ensureJava(requiredMajor, parentVersion, gameDir,
-                   [this, parentRoot, childRoot, gameDir, parentVersion, versionId,
-                    requiredMajor](const QString& javaExe)
-                   {
-                       launchModded(parentRoot, childRoot, gameDir, parentVersion,
-                                    versionId, javaExe, requiredMajor);
-                   });
+        launcher->ensureJava(parentVersion, gameDir,
+                             [this, parentRoot, childRoot, gameDir, parentVersion, versionId](const QString& javaExe)
+                             {
+                                 progressBar->hide();
+                                 int requiredMajor =
+                                         parentRoot["javaVersion"].toObject()["majorVersion"].toInt();
+                                 launcher->launchModded(parentRoot, childRoot, gameDir, parentVersion,
+                                                        versionId, javaExe, settingsWindow->username(), settingsWindow->ramAmount(), requiredMajor);
+                             }, settingsWindow->javaPath());
         return;
     }
 
@@ -331,17 +328,15 @@ void MainWindow::on_PlayButton_clicked()
         return;
     }
 
-    int requiredMajor = root["javaVersion"].toObject()["majorVersion"].toInt();
-    if (requiredMajor <= 0)
-        requiredMajor = requiredJavaMajor(version);
-
-    ensureJava(requiredMajor, version, gameDir,
-               [this, root, gameDir, version, versionDir, mainClass, requiredMajor]
-               (const QString& javaExe)
-               {
-                   launcher->launchGame(root, gameDir, version, versionDir, mainClass,
-                              javaExe, requiredMajor);
-               });
+    launcher->ensureJava(version, gameDir,
+                         [this, root, gameDir, version, versionDir, mainClass]
+                 (const QString& javaExe)
+                         {
+                             progressBar->hide();
+                             int requiredMajor = root["javaVersion"].toObject()["majorVersion"].toInt();
+                            launcher->launchGame(root, gameDir, version, versionDir, mainClass,
+                                                  javaExe, settingsWindow->username(), settingsWindow->ramAmount(), requiredMajor);
+                         }, settingsWindow->javaPath());
 }
 
 // ==================== Java provisioning ====================

@@ -197,8 +197,10 @@ QString MinecraftDownloader::findInstalledLoaderId(const QString& gameDir,
     return best;
 }
 
-/*void MinecraftDownloader::installFabric(const QString& mcVersion, const QString& gameDir)
+void MinecraftDownloader::installFabric(const QString& mcVersion, const QString& gameDir)
 {
+
+    /*
     const QString loaderListUrl =
         "https://meta.fabricmc.net/v2/versions/loader/" + mcVersion;
 
@@ -363,9 +365,9 @@ QString MinecraftDownloader::findInstalledLoaderId(const QString& gameDir,
                             }
                         });
             });
-}*/
-
-// Выбирает Maven-версию NeoForge, соответствующую версии Minecraft.
+            */
+}
+    // Выбирает Maven-версию NeoForge, соответствующую версии Minecraft.
 static QString pickNeoForgeMavenForMc(const QString& xml, const QString& mcVersion,
                                       bool allowPrerelease)
 {
