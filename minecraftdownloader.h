@@ -10,6 +10,10 @@
 #include <QVector>
 #include <QQueue>
 #include "downloading/downloader.h"
+#include "downloading/javadownloader.h"
+#include "downloading/manifestdownloader.h"
+
+struct MinecraftVersion;
 
 class MinecraftDownloader : public QObject
 {
@@ -43,7 +47,10 @@ public:
     static QString findInstalledLoaderId(const QString& gameDir,
                                          const QString& loader,
                                          const QString& mcVersion);
-
+    //TODO: private
+    Downloader d;
+    ManifestDownloader md;
+    JavaDownloader jd;
 
 signals:
     void vanillaVersionsReceived(const QVector<MinecraftVersion>& versions);
@@ -64,10 +71,6 @@ private:
 
     int totalFiles = 0;
     int completedFiles = 0;
-    void handleVanillaManifest(QNetworkReply* reply);
-    void handleFabricManifest(QNetworkReply* reply);
-    void handleForgeManifest(QNetworkReply* reply);
-    void handleNeoForgeManifest(QNetworkReply* reply);
 
     // Скачивает один asset-объект с атомарной записью и проверкой SHA1.
     // При сбое/несовпадении хэша повторяет загрузку (до 3 попыток).
@@ -88,5 +91,4 @@ private:
     void runLoaderInstaller(const QUrl& installerUrl, const QString& mcVersion,
                             const QString& loader, const QString& javaExe,
                             const QString& gameDir);
-    Downloader d;
 };

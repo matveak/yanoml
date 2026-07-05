@@ -55,6 +55,10 @@ Downloader::Downloader(QNetworkAccessManager *manager, QObject *parent) {
 	manager->setTransferTimeout(3000);
 }
 
+Downloader::Downloader(Downloader &other) {
+	this->manager = other.manager;
+}
+
 void Downloader::startNextDownload()
 {
 	while (activeDownloads < MaxParallelDownloads &&

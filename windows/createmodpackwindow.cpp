@@ -120,7 +120,7 @@ void CreateModpackWindow::setDownloader(
         this,
         &CreateModpackWindow::onNeoForgeVersions);
 
-    downloader->fetchVanillaVersions();
+    downloader->md.fetchVanillaVersions();
 }
 
 void CreateModpackWindow::loadLoaderVersions()
@@ -135,15 +135,15 @@ void CreateModpackWindow::loadLoaderVersions()
 
     if(loader == "Fabric")
     {
-        downloader->fetchFabricVersions();
+        downloader->md.fetchFabricVersions();
     }
     else if(loader == "Forge")
     {
-        downloader->fetchForgeVersions();
+        downloader->md.fetchForgeVersions();
     }
     else if(loader == "NeoForge")
     {
-        downloader->fetchNeoForgeVersions();
+        downloader->md.fetchNeoForgeVersions();
     }
 }
 
@@ -284,11 +284,11 @@ void CreateModpackWindow::onCreate()
     QString loaderVersion =
         loaderVersionBox->currentText();
 
-    downloader->createInstance(
-        version,
-        loader,
-        loaderVersion,
-        instancePath);
+    //downloader->createInstance(
+    //    version,
+    //    loader,
+    //    loaderVersion,
+    //    instancePath);
 
     QMessageBox::information(
         this,

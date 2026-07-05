@@ -9,21 +9,13 @@
 #include <QJsonObject>
 #include <QNetworkReply>
 
-struct MinecraftVersion
-{
-	QString gameVersion;
-	QString loaderVersion;
-	QString loaderType;
 
-	QString url;
-	QString releaseTime;
-
-	QString type;
-};
 
 ManifestDownloader::ManifestDownloader(QNetworkAccessManager *manager, QObject* parent) : Downloader(manager, parent) {
 
 }
+
+ManifestDownloader::ManifestDownloader(Downloader &d) : Downloader(d) {}
 
 void ManifestDownloader::fetchVanillaVersions()
 {

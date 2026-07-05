@@ -11,6 +11,7 @@
 
 
 class Downloader : public QObject {
+	Q_OBJECT
 protected:
 	struct DownloadTask
 	{
@@ -20,12 +21,17 @@ protected:
 
 	QQueue<DownloadTask> downloadQueue;
 	int activeDownloads = 0;
-	QNetworkAccessManager *manager;
+
 
 	static constexpr int MaxParallelDownloads = 6;
 
 public:
-	Downloader(QNetworkAccessManager *manager, QObject *parent = nullptr);
+	//TODO: protected
+	QNetworkAccessManager *manager;
+
+	explicit Downloader(QNetworkAccessManager *manager, QObject *parent = nullptr);
+
+	Downloader(Downloader &other);
 
 	void startNextDownload();
 

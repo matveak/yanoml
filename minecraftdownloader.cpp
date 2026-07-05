@@ -8,21 +8,10 @@
 #include <QTimer>
 #include <QProcess>
 
-MinecraftDownloader::MinecraftDownloader(QObject* parent) : d{new QNetworkAccessManager(parent), parent}
+MinecraftDownloader::MinecraftDownloader(QObject* parent) : d{new QNetworkAccessManager(parent), parent}, md{d}, jd{d}
 {
+
 }
-
-// ==================== HELPERS ====================
-
-// ==================== VANILLA ====================
-
-// ==================== FABRIC ====================
-
-
-// ==================== DOWNLOAD FILE ====================
-
-
-
 
 // ==================== DOWNLOAD VANILLA VERSION ====================
 
@@ -30,7 +19,7 @@ void MinecraftDownloader::downloadVanillaVersion(
     const QString& versionJsonUrl,
     const QString& outputJar)
 {
-    QNetworkReply* reply = manager.get(QNetworkRequest(QUrl(versionJsonUrl)));
+    QNetworkReply* reply = d.manager->get(QNetworkRequest(QUrl(versionJsonUrl)));
 
     connect(reply, &QNetworkReply::finished, this, [this, reply, outputJar]()
             {
@@ -78,7 +67,7 @@ void MinecraftDownloader::downloadAssetObject(const QUrl& url,
                                               const QString& instancePath,
                                               int attempt)
 {
-    QNetworkReply*      reply = manager.get(QNetworkRequest(url));
+    QNetworkReply*      reply = d.manager->get(QNetworkRequest(url));
     QSaveFile*          file  = new QSaveFile(outputPath);
     QCryptographicHash* sha1  = new QCryptographicHash(QCryptographicHash::Sha1);
 
@@ -244,7 +233,7 @@ void MinecraftDownloader::installFabric(const QString& mcVersion, const QString&
         "https://meta.fabricmc.net/v2/versions/loader/" + mcVersion;
 
     QNetworkReply* listReply =
-        manager.get(QNetworkRequest(QUrl(loaderListUrl)));
+        d.manager->get(QNetworkRequest(QUrl(loaderListUrl)));
 
     connect(listReply, &QNetworkReply::finished, this, [=]()
             {
@@ -279,7 +268,7 @@ void MinecraftDownloader::installFabric(const QString& mcVersion, const QString&
                     "/" + loaderVersion + "/profile/json";
 
                 QNetworkReply* profReply =
-                    manager.get(QNetworkRequest(QUrl(profileUrl)));
+                    d.manager->get(QNetworkRequest(QUrl(profileUrl)));
 
                 connect(profReply, &QNetworkReply::finished, this, [=]()
                         {
@@ -372,7 +361,7 @@ void MinecraftDownloader::installFabric(const QString& mcVersion, const QString&
                                 QDir().mkpath(QFileInfo(item.path).path());
 
                                 QNetworkReply* r =
-                                    manager.get(QNetworkRequest(item.url));
+                                    d.manager->get(QNetworkRequest(item.url));
                                 QSaveFile* f = new QSaveFile(item.path);
 
                                 if (!f->open(QIODevice::WriteOnly))
@@ -462,7 +451,7 @@ void MinecraftDownloader::installForgeLike(const QString& mcVersion,
 {
     if (loader == "forge")
     {
-        QNetworkReply* promoReply = manager.get(QNetworkRequest(QUrl(
+        QNetworkReply* promoReply = d.manager->get(QNetworkRequest(QUrl(
             "https://files.minecraftforge.net/net/minecraftforge/forge/"
             "promotions_slim.json")));
 
@@ -501,7 +490,7 @@ void MinecraftDownloader::installForgeLike(const QString& mcVersion,
     }
     else // neoforge
     {
-        QNetworkReply* metaReply = manager.get(QNetworkRequest(QUrl(
+        QNetworkReply* metaReply = d.manager->get(QNetworkRequest(QUrl(
             "https://maven.neoforged.net/releases/net/neoforged/neoforge/"
             "maven-metadata.xml")));
 
@@ -622,7 +611,7 @@ void MinecraftDownloader::runLoaderInstaller(const QUrl& installerUrl,
         return;
     }
 
-    QNetworkReply* r = manager.get(QNetworkRequest(installerUrl));
+    QNetworkReply* r = d.manager->get(QNetworkRequest(installerUrl));
     QSaveFile* f = new QSaveFile(installerPath);
 
     if (!f->open(QIODevice::WriteOnly))

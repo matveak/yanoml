@@ -8,7 +8,17 @@
 #include "downloader.h"
 
 
-struct MinecraftVersion;
+struct MinecraftVersion
+{
+	QString gameVersion;
+	QString loaderVersion;
+	QString loaderType;
+
+	QString url;
+	QString releaseTime;
+
+	QString type;
+};
 
 class ManifestDownloader : public Downloader
 {
@@ -18,6 +28,8 @@ public:
 	explicit ManifestDownloader(
 		QNetworkAccessManager* manager,
 		QObject* parent = nullptr);
+
+	ManifestDownloader(Downloader &d);
 
 	void fetchVanillaVersions();
 	void fetchFabricVersions();

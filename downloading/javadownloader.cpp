@@ -11,8 +11,11 @@
 
 // ==================== JAVA RUNTIME ====================
 
+JavaDownloader::JavaDownloader(Downloader &downloader) : Downloader(downloader) {}
+
+
 void JavaDownloader::downloadJavaRuntime(const QString& component,
-                                              const QString& outputDir) {
+                                         const QString& outputDir) {
 #if defined(Q_OS_WIN)
 #  if defined(Q_PROCESSOR_ARM)
     const QString platformKey = "windows-arm64";

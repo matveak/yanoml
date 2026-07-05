@@ -8,9 +8,11 @@
 #include "downloader.h"
 
 class JavaDownloader : public Downloader {
+	Q_OBJECT
 	public:
-	JavaDownloader();
 
+
+	JavaDownloader(Downloader &downloader);
 
 	void downloadJavaRuntime(const QString &component, const QString &outputDir);
 

@@ -556,7 +556,7 @@ void MainWindow::on_InstallerButton_clicked()
     if (!modded)
     {
         // Чистая ваниль.
-        downloader->createInstance(cleanVersion, "", "", gameDir);
+        //downloader->createInstance(cleanVersion, "", "", gameDir);
         QMessageBox::information(this, "Установка",
                                  "Начато скачивание " + versionText);
         return;
@@ -573,7 +573,7 @@ void MainWindow::on_InstallerButton_clicked()
                         startLoaderInstall(loader, cleanVersion, gameDir);
                     });
 
-    downloader->createInstance(cleanVersion, "", "", gameDir);
+    //downloader->createInstance(cleanVersion, "", "", gameDir);
     QMessageBox::information(this, "Установка",
                              "Начато скачивание " + versionText +
                                  ".\nПосле базовой версии будет установлен загрузчик "
@@ -781,7 +781,7 @@ void MainWindow::ensureJava(int requiredMajor,
                         cb(javaExe);
                     });
 
-    downloader->downloadJavaRuntime(javaComponent, runtimeDir);
+    downloader->jd.downloadJavaRuntime(javaComponent, runtimeDir);
 }
 
 // ==================== Launch ====================
@@ -1401,17 +1401,17 @@ void MainWindow::onLoaderChanged(const QString& loader)
 {
     VersionBox->clear();
 
-    if (loader == "Vanilla")        downloader->fetchVanillaVersions();
-    else if (loader == "Fabric")    downloader->fetchFabricVersions();
-    else if (loader == "Forge")     downloader->fetchForgeVersions();
-    else if (loader == "NeoForge")  downloader->fetchNeoForgeVersions();
+    if (loader == "Vanilla")        downloader->md.fetchVanillaVersions();
+    else if (loader == "Fabric")    downloader->md.fetchFabricVersions();
+    else if (loader == "Forge")     downloader->md.fetchForgeVersions();
+    else if (loader == "NeoForge")  downloader->md.fetchNeoForgeVersions();
 }
 
 void MainWindow::onShowSnapshotsChanged(int)
 {
     VersionBox->clear();
     VersionBox->addItem("Обновление списка...");
-    downloader->fetchVanillaVersions();
+    downloader->md.fetchVanillaVersions();
 }
 
 void MainWindow::onVanillaVersionsReceived(const QVector<MinecraftVersion>& versions)
@@ -1540,7 +1540,7 @@ void MainWindow::loadVersions()
 
     VersionBox->clear();
     VersionBox->addItem("Загрузка версий...");
-    downloader->fetchVanillaVersions();
+    downloader->md.fetchVanillaVersions();
 }
 
 void MainWindow::on_CurseForgeButton_clicked()
