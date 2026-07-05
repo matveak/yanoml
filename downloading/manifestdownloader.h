@@ -29,7 +29,6 @@ signals:
 	void fabricVersionsReceived(const QJsonArray&);
 	void forgeVersionsReceived(const QJsonObject&);
 	void neoforgeVersionReceived(const QString&);
-	void errorOccurred(const QString&);
 
 private:
 	void handleVanillaManifest(QNetworkReply*);

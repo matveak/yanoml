@@ -16,39 +16,6 @@ MinecraftDownloader::MinecraftDownloader(QObject* parent) : d{new QNetworkAccess
 
 // ==================== VANILLA ====================
 
-void MinecraftDownloader::handleVanillaManifest(QNetworkReply* reply)
-{
-    QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
-
-    if (!doc.isObject())
-    {
-        emit errorOccurred("Некорректный ответ Mojang");
-        return;
-    }
-
-    QJsonArray versionsArray = doc.object()["versions"].toArray();
-
-    QVector<MinecraftVersion> versions;
-
-    for (const auto& value : versionsArray)
-    {
-        QJsonObject obj = value.toObject();
-
-        MinecraftVersion ver;
-        ver.gameVersion  = obj["id"].toString();
-        ver.loaderVersion = "";
-        ver.loaderType   = obj["type"].toString();
-        ver.url          = obj["url"].toString();
-        ver.releaseTime  = obj["releaseTime"].toString();
-
-        versions.push_back(ver);
-    }
-
-    qDebug() << "Loaded versions:" << versions.size();
-
-    emit vanillaVersionsReceived(versions);
-}
-
 // ==================== FABRIC ====================
 
 

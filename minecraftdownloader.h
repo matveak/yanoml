@@ -11,17 +11,6 @@
 #include <QQueue>
 #include "downloading/downloader.h"
 
-struct MinecraftVersion
-{
-    QString gameVersion;
-    QString loaderVersion;
-    QString loaderType;
-
-    QString url;
-    QString releaseTime;
-
-    QString type;
-};
 class MinecraftDownloader : public QObject
 {
     Q_OBJECT

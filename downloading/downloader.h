@@ -34,10 +34,10 @@ public:
 	void startDownload(const DownloadTask& task);
 	void downloadLibrariesFromVersionJson(const QString& versionJsonPath, const QString& gameDir, std::function<void()> onFinished);
 
-	signals:
-		void fileDownloaded(const QString& filePath);
-		void downloadProgress(qint64 bytesReceived, qint64 bytesTotal);
-		void errorOccurred(const QString& errorString);
+signals:
+	void fileDownloaded(const QString& filePath);
+	void downloadProgress(qint64 bytesReceived, qint64 bytesTotal);
+	void errorOccurred(const QString& errorString);
 };
 
 
