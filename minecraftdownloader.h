@@ -38,10 +38,6 @@ public:
     void installForgeLike(const QString& mcVersion, const QString& loader,
                           const QString& javaExe, const QString& gameDir);
 
-    // Преобразует Maven-координаты (group:artifact:version[:classifier][@ext])
-    // в относительный путь внутри libraries/.
-    static QString mavenNameToPath(const QString& name);
-
     // Ищет установленную версию загрузчика (по inheritsFrom == mcVersion и
     // имени каталога, содержащему имя загрузчика). Возвращает id или "".
     static QString findInstalledLoaderId(const QString& gameDir,

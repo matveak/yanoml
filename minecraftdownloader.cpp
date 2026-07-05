@@ -153,36 +153,6 @@ void MinecraftDownloader::downloadAssetObject(const QUrl& url,
 
 // ==================== MOD LOADERS ====================
 
-QString MinecraftDownloader::mavenNameToPath(const QString& name)
-{
-    // group:artifact:version[:classifier][@ext]
-    QString work = name;
-    QString ext = "jar";
-
-    const int at = work.indexOf('@');
-    if (at >= 0)
-    {
-        ext  = work.mid(at + 1);
-        work = work.left(at);
-    }
-
-    const QStringList parts = work.split(':');
-    if (parts.size() < 3)
-        return QString();
-
-    QString group      = parts[0];
-    const QString artifact   = parts[1];
-    const QString version    = parts[2];
-    const QString classifier = parts.size() >= 4 ? parts[3] : QString();
-
-    QString file = artifact + "-" + version;
-    if (!classifier.isEmpty())
-        file += "-" + classifier;
-    file += "." + ext;
-
-    return group.replace('.', '/') + "/" + artifact + "/" + version + "/" + file;
-}
-
 QString MinecraftDownloader::findInstalledLoaderId(const QString& gameDir,
                                                    const QString& loader,
                                                    const QString& mcVersion)
@@ -227,7 +197,7 @@ QString MinecraftDownloader::findInstalledLoaderId(const QString& gameDir,
     return best;
 }
 
-void MinecraftDownloader::installFabric(const QString& mcVersion, const QString& gameDir)
+/*void MinecraftDownloader::installFabric(const QString& mcVersion, const QString& gameDir)
 {
     const QString loaderListUrl =
         "https://meta.fabricmc.net/v2/versions/loader/" + mcVersion;
@@ -393,7 +363,7 @@ void MinecraftDownloader::installFabric(const QString& mcVersion, const QString&
                             }
                         });
             });
-}
+}*/
 
 // Выбирает Maven-версию NeoForge, соответствующую версии Minecraft.
 static QString pickNeoForgeMavenForMc(const QString& xml, const QString& mcVersion,
