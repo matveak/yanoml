@@ -1,11 +1,10 @@
 #pragma once
 
+#include <QPoint>
 #include <QWidget>
 
 class QLabel;
-
 class QPushButton;
-
 class QHBoxLayout;
 
 class TitleBar : public QWidget
@@ -13,38 +12,31 @@ class TitleBar : public QWidget
 	Q_OBJECT
 
 public:
+	explicit TitleBar(QWidget* window, QWidget* parent = nullptr);
 
-	explicit TitleBar(QWidget *parent = nullptr);
+	void setTitle(const QString& title);
 
-	QWidget *leftContainer() const;
+	QWidget* leftContainer() const;
+	QWidget* rightContainer() const;
 
-	QWidget *rightContainer() const;
-
-	void setTitle(const QString&);
-
-	signals:
-
-		void minimizeRequested();
-
-	void maximizeRequested();
-
-	void closeRequested();
+	QHBoxLayout* leftLayout() const;
+	QHBoxLayout* rightLayout() const;
 
 protected:
-
-	void mousePressEvent(QMouseEvent *) override;
-
-	void mouseMoveEvent(QMouseEvent *) override;
-
-	void mouseDoubleClickEvent(QMouseEvent *) override;
+	void mousePressEvent(QMouseEvent* event) override;
+	void mouseMoveEvent(QMouseEvent* event) override;
+	void mouseDoubleClickEvent(QMouseEvent* event) override;
 
 private:
+	QWidget* m_window;
 
-	QLabel *m_title;
+	QLabel* m_title;
 
-	QWidget *m_left;
+	QWidget* m_leftContainer;
+	QWidget* m_rightContainer;
 
-	QWidget *m_right;
+	QHBoxLayout* m_leftLayout;
+	QHBoxLayout* m_rightLayout;
 
-	QPoint m_dragPos;
+	QPoint m_dragPosition;
 };

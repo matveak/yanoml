@@ -6,35 +6,50 @@
 #include <QLabel>
 #include <QMouseEvent>
 #include <QPushButton>
-#include <QWindow>
 
-TitleBar::TitleBar(QWidget *parent)
-    : QWidget(parent)
+TitleBar::TitleBar(QWidget *window, QWidget *parent)
+    : QWidget(parent),
+      m_window(window)
 {
     setObjectName("titleBar");
     setFixedHeight(36);
 
-    auto layout = new QHBoxLayout(this);
+    auto mainLayout = new QHBoxLayout(this);
 
-    layout->setContentsMargins(8, 0, 8, 0);
-    layout->setSpacing(4);
+    mainLayout->setContentsMargins(8, 4, 8, 4);
+    mainLayout->setSpacing(6);
 
-    m_left = new QWidget(this);
-    auto leftLayout = new QHBoxLayout(m_left);
-    leftLayout->setContentsMargins(0,0,0,0);
-    leftLayout->setSpacing(4);
+    //==========================================================
+    // Левая часть
+    //==========================================================
 
-    m_right = new QWidget(this);
-    auto rightLayout = new QHBoxLayout(m_right);
-    rightLayout->setContentsMargins(0,0,0,0);
-    rightLayout->setSpacing(2);
+    m_leftContainer = new QWidget(this);
+    m_leftLayout = new QHBoxLayout(m_leftContainer);
 
-    m_title = new QLabel(windowTitle(), this);
+    m_leftLayout->setContentsMargins(0, 0, 0, 0);
+    m_leftLayout->setSpacing(4);
+
+    //==========================================================
+    // Заголовок
+    //==========================================================
+
+    m_title = new QLabel(this);
+
     m_title->setAlignment(Qt::AlignCenter);
 
-    auto minimizeButton = new QPushButton("-", this);
-    auto maximizeButton = new QPushButton("□", this);
-    auto closeButton = new QPushButton("✕", this);
+    //==========================================================
+    // Правая часть
+    //==========================================================
+
+    m_rightContainer = new QWidget(this);
+    m_rightLayout = new QHBoxLayout(m_rightContainer);
+
+    m_rightLayout->setContentsMargins(0, 0, 0, 0);
+    m_rightLayout->setSpacing(2);
+
+    auto minimizeButton = new QPushButton("—");
+    auto maximizeButton = new QPushButton("□");
+    auto closeButton = new QPushButton("✕");
 
     QList<QPushButton*> buttons =
     {
@@ -49,33 +64,91 @@ TitleBar::TitleBar(QWidget *parent)
         button->setCursor(Qt::PointingHandCursor);
         button->setFlat(true);
 
-        button->setStyleSheet(QString(R"(
+        m_rightLayout->addWidget(button);
+    }
+
+    //==========================================================
+    // Layout
+    //==========================================================
+
+    mainLayout->addWidget(m_leftContainer);
+
+    mainLayout->addStretch();
+
+    mainLayout->addWidget(m_title);
+
+    mainLayout->addStretch();
+
+    mainLayout->addWidget(m_rightContainer);
+
+    //==========================================================
+    // Кнопки
+    //==========================================================
+
+    connect(closeButton,
+            &QPushButton::clicked,
+            m_window,
+            &QWidget::close);
+
+    connect(minimizeButton,
+            &QPushButton::clicked,
+            m_window,
+            &QWidget::showMinimized);
+
+    connect(maximizeButton,
+            &QPushButton::clicked,
+            this,
+            [this]
+            {
+                if (m_window->isMaximized())
+                    m_window->showNormal();
+                else
+                    m_window->showMaximized();
+            });
+
+    //==========================================================
+    // Style
+    //==========================================================
+
+    setStyleSheet(QString(R"(
+
+#titleBar
+{
+    background:%1;
+    border-top-left-radius:10px;
+    border-top-right-radius:10px;
+}
+
+QLabel
+{
+    color:%2;
+    background:transparent;
+    font-weight:bold;
+}
 
 QPushButton
 {
     border:none;
     border-radius:6px;
     background:transparent;
-    color:%1;
+    color:%2;
 }
 
 QPushButton:hover
 {
-    background:%2;
+    background:%3;
 }
 
 QPushButton:pressed
 {
-    background:%3;
+    background:%4;
 }
 
 )")
-            .arg(Theme::text().name())
-            .arg(Theme::panelHighlight().name())
-            .arg(Theme::panel().name()));
-
-        rightLayout->addWidget(button);
-    }
+        .arg(Theme::panel().name())
+        .arg(Theme::text().name())
+        .arg(Theme::panelHighlight().name())
+        .arg(Theme::panel().name()));
 
     closeButton->setStyleSheet(QString(R"(
 
@@ -101,74 +174,26 @@ QPushButton:pressed
 
 )")
         .arg(Theme::text().name()));
-
-    layout->addWidget(m_left);
-
-    layout->addStretch();
-
-    layout->addWidget(m_title);
-
-    layout->addStretch();
-
-    layout->addWidget(m_right);
-
-    connect(closeButton,
-            &QPushButton::clicked,
-            this,
-            [this]()
-            {
-                window()->close();
-            });
-
-    connect(minimizeButton,
-            &QPushButton::clicked,
-            this,
-            [this]()
-            {
-                window()->showMinimized();
-            });
-
-    connect(maximizeButton,
-            &QPushButton::clicked,
-            this,
-            [this]()
-            {
-                if (window()->isMaximized())
-                    window()->showNormal();
-                else
-                    window()->showMaximized();
-            });
-
-    setStyleSheet(QString(R"(
-
-#titleBar
-{
-    background:%1;
-    border-top-left-radius:10px;
-    border-top-right-radius:10px;
-}
-
-QLabel
-{
-    color:%2;
-    font-size:13px;
-    font-weight:bold;
-    background:transparent;
-}
-
-)")
-        .arg(Theme::panel().name())
-        .arg(Theme::text().name()));
 }
 
 QWidget *TitleBar::leftContainer() const
 {
-    return m_left;
+    return m_leftContainer;
 }
 
 QWidget *TitleBar::rightContainer() const
 {
-    return m_right;
+    return m_rightContainer;
+}
+
+QHBoxLayout *TitleBar::leftLayout() const
+{
+    return m_leftLayout;
+}
+
+QHBoxLayout *TitleBar::rightLayout() const
+{
+    return m_rightLayout;
 }
 
 void TitleBar::setTitle(const QString &title)
@@ -181,11 +206,13 @@ void TitleBar::mousePressEvent(QMouseEvent *event)
     if (event->button() == Qt::LeftButton)
     {
 #if QT_VERSION >= QT_VERSION_CHECK(6,0,0)
-        m_dragPos = event->globalPosition().toPoint()
-                    - window()->frameGeometry().topLeft();
+        m_dragPosition =
+            event->globalPosition().toPoint() -
+            m_window->frameGeometry().topLeft();
 #else
-        m_dragPos = event->globalPos()
-                    - window()->frameGeometry().topLeft();
+        m_dragPosition =
+            event->globalPos() -
+            m_window->frameGeometry().topLeft();
 #endif
     }
 
@@ -200,10 +227,15 @@ void TitleBar::mouseMoveEvent(QMouseEvent *event)
         return;
     }
 
-    if (window()->isMaximized())
+    if (m_window->isMaximized())
         return;
 
-    window()->move(event->globalPosition().toPoint() - m_dragPos);
+#if QT_VERSION >= QT_VERSION_CHECK(6,0,0)
+    m_window->move(event->globalPosition().toPoint() - m_dragPosition);
+#else
+    m_window->move(event->globalPos() - m_dragPosition);
+#endif
+
     QWidget::mouseMoveEvent(event);
 }
 
@@ -211,10 +243,10 @@ void TitleBar::mouseDoubleClickEvent(QMouseEvent *event)
 {
     if (event->button() == Qt::LeftButton)
     {
-        if (window()->isMaximized())
-            window()->showNormal();
+        if (m_window->isMaximized())
+            m_window->showNormal();
         else
-            window()->showMaximized();
+            m_window->showMaximized();
     }
 
     QWidget::mouseDoubleClickEvent(event);

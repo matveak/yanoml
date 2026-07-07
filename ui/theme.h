@@ -6,7 +6,7 @@
 class Theme
 {
 public:
-	// ===== Цвета =====
+	// ===== Основные цвета =====
 
 	static const QColor& background();
 	static const QColor& panel();
@@ -26,6 +26,19 @@ public:
 	static QString accentButtonStyle();
 
 	static QString curseForgeButtonStyle();
+
+	// ===== Изменение темы =====
+
+	static void setBackground(const QColor& color);
+	static void setPanel(const QColor& color);
+	static void setPanelHighlight(const QColor& color);
+	static void setBorder(const QColor& color);
+
+	static void setText(const QColor& color);
+	static void setTextDim(const QColor& color);
+
+	static void setAccent(const QColor& color);
+	static void setAccentCurseForge(const QColor& color);
 
 private:
 	Theme() = delete;

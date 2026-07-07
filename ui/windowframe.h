@@ -2,27 +2,29 @@
 
 #include <QFrame>
 
-class TitleBar;
-
 class QVBoxLayout;
+class TitleBar;
 
 class WindowFrame : public QFrame
 {
 	Q_OBJECT
 
 public:
-
 	explicit WindowFrame(QWidget *parent = nullptr);
 
 	QWidget *contentWidget() const;
 
 	TitleBar *titleBar() const;
 
+	void setTitle(const QString& title);
+
 private:
+	void setupUi();
 
-	TitleBar *m_titleBar;
+private:
+	QVBoxLayout *m_layout = nullptr;
 
-	QWidget *m_content;
+	TitleBar *m_titleBar = nullptr;
 
-	QVBoxLayout *m_layout;
+	QWidget *m_contentWidget = nullptr;
 };

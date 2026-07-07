@@ -11,6 +11,10 @@ QColor Theme::s_textDim("#9CA3AF");
 QColor Theme::s_accent("#1BD96A");
 QColor Theme::s_accentCurseForge("#F16436");
 
+//------------------------------------------------------------
+// Цвета
+//------------------------------------------------------------
+
 const QColor& Theme::background()
 {
     return s_background;
@@ -51,6 +55,54 @@ const QColor& Theme::accentCurseForge()
     return s_accentCurseForge;
 }
 
+//------------------------------------------------------------
+// Setters
+//------------------------------------------------------------
+
+void Theme::setBackground(const QColor& color)
+{
+    s_background = color;
+}
+
+void Theme::setPanel(const QColor& color)
+{
+    s_panel = color;
+}
+
+void Theme::setPanelHighlight(const QColor& color)
+{
+    s_panelHighlight = color;
+}
+
+void Theme::setBorder(const QColor& color)
+{
+    s_border = color;
+}
+
+void Theme::setText(const QColor& color)
+{
+    s_text = color;
+}
+
+void Theme::setTextDim(const QColor& color)
+{
+    s_textDim = color;
+}
+
+void Theme::setAccent(const QColor& color)
+{
+    s_accent = color;
+}
+
+void Theme::setAccentCurseForge(const QColor& color)
+{
+    s_accentCurseForge = color;
+}
+
+//------------------------------------------------------------
+// Стили
+//------------------------------------------------------------
+
 QString Theme::dialogStyle()
 {
     return QString(R"(
@@ -62,8 +114,8 @@ QDialog, QWidget {
 }
 
 QLabel {
-    color:%2;
     background:transparent;
+    color:%2;
 }
 
 QLineEdit {
@@ -217,7 +269,8 @@ QString Theme::accentButtonStyle()
 {
     return QString(R"(
 
-QPushButton {
+QPushButton
+{
     background-color:%1;
     color:#0A0A0A;
     border:none;
@@ -226,11 +279,13 @@ QPushButton {
     padding:8px 16px;
 }
 
-QPushButton:hover {
+QPushButton:hover
+{
     background-color:#15C25E;
 }
 
-QPushButton:pressed {
+QPushButton:pressed
+{
     background-color:#0FA34E;
 }
 
@@ -242,7 +297,8 @@ QString Theme::curseForgeButtonStyle()
 {
     return QString(R"(
 
-QPushButton {
+QPushButton
+{
     background-color:%1;
     color:white;
     border:none;
@@ -251,11 +307,13 @@ QPushButton {
     padding:8px 16px;
 }
 
-QPushButton:hover {
+QPushButton:hover
+{
     background-color:#D95A2D;
 }
 
-QPushButton:pressed {
+QPushButton:pressed
+{
     background-color:#C04F26;
 }
 
