@@ -6,6 +6,7 @@
 
 #include "../minecraftdownloader.h"
 
+class WindowFrame;
 class QLineEdit;
 class QComboBox;
 class QPushButton;
@@ -39,6 +40,8 @@ private slots:
     void loadLoaderVersions();
 
 private:
+    WindowFrame* frame = nullptr;
+
     MinecraftDownloader* downloader = nullptr;
     SettingsWindow* settingsWindow = nullptr;
 

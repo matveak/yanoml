@@ -1,6 +1,8 @@
 #include "createmodpackwindow.h"
 #include "settingswindow.h"
 #include "darktheme.h"
+#include "../ui/windowframe.h"
+#include "../ui/theme.h"
 
 #include <QVBoxLayout>
 #include <QLineEdit>
@@ -15,12 +17,25 @@
 CreateModpackWindow::CreateModpackWindow(QWidget* parent)
     : QDialog(parent)
 {
-    setWindowTitle("Создание сборки");
+    setWindowFlags(Qt::FramelessWindowHint | Qt::Dialog);
     resize(500, 320);
-    setStyleSheet(DarkTheme::dialogStyle());
 
-    QVBoxLayout* layout =
+    frame = new WindowFrame(this);
+
+    frame->setTitle("Создание сборки");
+
+    setStyleSheet(Theme::dialogStyle());
+
+    auto* rootLayout =
         new QVBoxLayout(this);
+
+    rootLayout->setContentsMargins(0,0,0,0);
+    rootLayout->setSpacing(0);
+
+    rootLayout->addWidget(frame);
+
+    auto* layout =
+        new QVBoxLayout(frame->contentWidget());
 
     layout->addWidget(
         new QLabel("Название сборки"));

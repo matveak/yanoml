@@ -1,15 +1,15 @@
 #include "theme.h"
 
-QColor Theme::s_background("#16181C");
-QColor Theme::s_panel("#26292F");
-QColor Theme::s_panelHighlight("#2F333A");
-QColor Theme::s_border("#3A3E45");
+QColor Theme::s_background(0x16, 0x18, 0x1C);
+QColor Theme::s_panel(0x26, 0x29, 0x2F);
+QColor Theme::s_panelHighlight(0x2F, 0x33, 0x3A);
+QColor Theme::s_border(0x3A, 0x3E, 0x45);
 
-QColor Theme::s_text("#E8EAED");
-QColor Theme::s_textDim("#9CA3AF");
+QColor Theme::s_text(0xE8, 0xEA, 0xED);
+QColor Theme::s_textDim(0x9C, 0xA3, 0xAF);
 
-QColor Theme::s_accent("#1BD96A");
-QColor Theme::s_accentCurseForge("#F16436");
+QColor Theme::s_accent(0x1B, 0xD9, 0x6A);
+QColor Theme::s_accentCurseForge(0xF1, 0x64, 0x36);
 
 //------------------------------------------------------------
 // Цвета
