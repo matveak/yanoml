@@ -15,14 +15,7 @@
 #include <QPixmap>
 #include <QDebug>
 
-namespace {
-const char* kBg      = DarkTheme::kBg;
-const char* kPanel   = DarkTheme::kPanel;
-const char* kBorder  = DarkTheme::kBorder;
-const char* kText    = DarkTheme::kText;
-const char* kTextDim = DarkTheme::kTextDim;
-const char* kAccent  = DarkTheme::kAccent;
-} // namespace
+using namespace DarkTheme;
 
 ModDetailsWindow::ModDetailsWindow(
     const Mod& mod,
@@ -32,7 +25,7 @@ ModDetailsWindow::ModDetailsWindow(
 {
     resize(1000, 750);
     setWindowTitle(mod.name);
-    setStyleSheet(DarkTheme::dialogStyle());
+    setStyleSheet(dialogStyle());
 
     api = new ModrithAPI(this);
     manager = new QNetworkAccessManager(this);
