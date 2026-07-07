@@ -1,6 +1,7 @@
 #include "curseforgewindow.h"
-#include "darktheme.h"
 #include "settingswindow.h"
+#include "../ui/theme.h"
+#include "../ui/windowframe.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -22,8 +23,6 @@
 #include <QNetworkRequest>
 #include <QPixmap>
 
-using namespace DarkTheme;
-
 // ── Общие версии MC (упрощённо, реальный список грузить через API дорого) ────
 static QStringList defaultMCVersions() {
     return {"Любая версия","1.21.4","1.21.3","1.21.1","1.21",
@@ -36,9 +35,27 @@ static QStringList defaultMCVersions() {
 // ─────────────────────────────────────────────────────────────────────────────
 CurseForgeWindow::CurseForgeWindow(QWidget* parent) : QDialog(parent)
 {
-    setWindowTitle("CurseForge — Моды и Модпаки");
+    setWindowFlags(Qt::FramelessWindowHint | Qt::Dialog);
+    resize(500, 320);
+
+    frame = new WindowFrame(this);
+
+    setStyleSheet(Theme::dialogStyle());
+
+    auto* rootLayout =
+        new QVBoxLayout(this);
+
+    rootLayout->setContentsMargins(0,0,0,0);
+    rootLayout->setSpacing(0);
+
+    rootLayout->addWidget(frame);
+
+    auto* root =
+        new QVBoxLayout(frame->contentWidget());
+
+    frame->setTitle("CurseForge — Моды и Модпаки");
     resize(1300, 860);
-    setStyleSheet(dialogStyle());
+    setStyleSheet(Theme::dialogStyle());
 
     m_cf  = new CurseForgeClient(this);
     m_nam = new QNetworkAccessManager(this);
@@ -51,16 +68,15 @@ CurseForgeWindow::CurseForgeWindow(QWidget* parent) : QDialog(parent)
         m_progress->hide();
     });
 
-    QVBoxLayout* root = new QVBoxLayout(this);
     root->setContentsMargins(16,16,16,16);
     root->setSpacing(12);
 
     // Заголовок
     QHBoxLayout* header = new QHBoxLayout();
     QLabel* logo = new QLabel("🔥 CurseForge");
-    logo->setStyleSheet(QString("font-size:22px; font-weight:bold; color:%1;").arg(kAccentCF));
+    logo->setStyleSheet(QString("font-size:22px; font-weight:bold; color:%1;").arg(Theme::accentCurseForge().name()));
     QLabel* sub  = new QLabel("Моды и модпаки для Minecraft");
-    sub->setStyleSheet(QString("color:%1; font-size:13px;").arg(kTextDim));
+    sub->setStyleSheet(QString("color:%1; font-size:13px;").arg(Theme::textDim().name()));
     header->addWidget(logo);
     header->addSpacing(12);
     header->addWidget(sub, 1);
@@ -77,7 +93,7 @@ CurseForgeWindow::CurseForgeWindow(QWidget* parent) : QDialog(parent)
     root->addWidget(m_progress);
 
     m_status = new QLabel("", this);
-    m_status->setStyleSheet(QString("color:%1; font-size:12px;").arg(kTextDim));
+    m_status->setStyleSheet(QString("color:%1; font-size:12px;").arg(Theme::textDim().name()));
     root->addWidget(m_status);
 
     // Вкладки
@@ -121,7 +137,7 @@ void CurseForgeWindow::buildModsTab()
 
     QPushButton* btn = new QPushButton("Найти");
     btn->setFixedHeight(38);
-    btn->setStyleSheet(cfButton());
+    btn->setStyleSheet(Theme::curseForgeButtonStyle());
     connect(btn, &QPushButton::clicked, this, &CurseForgeWindow::onSearch);
     connect(m_modSearch, &QLineEdit::returnPressed, this, &CurseForgeWindow::onSearch);
     row->addWidget(btn);
@@ -161,7 +177,7 @@ void CurseForgeWindow::buildModpacksTab()
 
     QPushButton* btn = new QPushButton("Найти");
     btn->setFixedHeight(38);
-    btn->setStyleSheet(cfButton());
+    btn->setStyleSheet(Theme::curseForgeButtonStyle());
     connect(btn, &QPushButton::clicked, this, &CurseForgeWindow::onSearch);
     connect(m_packSearch, &QLineEdit::returnPressed, this, &CurseForgeWindow::onSearch);
     row->addWidget(btn);
@@ -239,7 +255,7 @@ void CurseForgeWindow::addCards(const QVector<CFMod>& mods,
                                 "QFrame { background-color:%1; border:1px solid %2;"
                                 " border-radius:10px; }"
                                 "QFrame:hover { border-color:%3; }")
-                                .arg(kPanel, kBorder, isModpack ? kAccentCF : kAccent));
+                                .arg(Theme::panel().name(), Theme::border().name(), isModpack ? Theme::accentCurseForge().name() : Theme::accent().name()));
         card->setMinimumHeight(90);
 
         QHBoxLayout* hl = new QHBoxLayout(card);
@@ -249,7 +265,7 @@ void CurseForgeWindow::addCards(const QVector<CFMod>& mods,
         // Иконка
         QLabel* icon = new QLabel();
         icon->setFixedSize(64, 64);
-        icon->setStyleSheet(QString("border-radius:8px; background:%1; border:none;").arg(kPanelHi));
+        icon->setStyleSheet(QString("border-radius:8px; background:%1; border:none;").arg(Theme::panelHighlight().name()));
         icon->setScaledContents(true);
         hl->addWidget(icon, 0, Qt::AlignTop);
 
@@ -271,14 +287,14 @@ void CurseForgeWindow::addCards(const QVector<CFMod>& mods,
         info->addWidget(title);
 
         QLabel* author = new QLabel("by " + mod.author);
-        author->setStyleSheet(QString("color:%1; font-size:12px; border:none;").arg(kTextDim));
+        author->setStyleSheet(QString("color:%1; font-size:12px; border:none;").arg(Theme::textDim().name()));
         info->addWidget(author);
 
         QString descText = mod.summary.length() > 120
                                ? mod.summary.left(120) + "..." : mod.summary;
         QLabel* desc = new QLabel(descText);
         desc->setWordWrap(true);
-        desc->setStyleSheet(QString("color:%1; font-size:12px; border:none;").arg(kTextDim));
+        desc->setStyleSheet(QString("color:%1; font-size:12px; border:none;").arg(Theme::textDim().name()));
         info->addWidget(desc);
 
         // Версии
@@ -288,7 +304,7 @@ void CurseForgeWindow::addCards(const QVector<CFMod>& mods,
             QString verStr = vers.mid(0, 4).join(", ");
             if (vers.size() > 4) verStr += "...";
             QLabel* verLbl = new QLabel("MC: " + verStr);
-            verLbl->setStyleSheet(QString("color:%1; font-size:11px; border:none;").arg(kTextDim));
+            verLbl->setStyleSheet(QString("color:%1; font-size:11px; border:none;").arg(Theme::textDim().name()));
             info->addWidget(verLbl);
         }
 
@@ -300,7 +316,7 @@ void CurseForgeWindow::addCards(const QVector<CFMod>& mods,
 
         QLabel* dl = new QLabel("⬇ " + formatCount(mod.downloadCount));
         dl->setAlignment(Qt::AlignRight);
-        dl->setStyleSheet(QString("color:%1; border:none;").arg(kTextDim));
+        dl->setStyleSheet(QString("color:%1; border:none;").arg(Theme::textDim().name()));
         right->addWidget(dl);
 
         right->addStretch(1);
@@ -309,11 +325,11 @@ void CurseForgeWindow::addCards(const QVector<CFMod>& mods,
         installBtn->setFixedWidth(130);
         installBtn->setFixedHeight(36);
         installBtn->setCursor(Qt::PointingHandCursor);
-        if (isModpack) installBtn->setStyleSheet(cfButton());
+        if (isModpack) installBtn->setStyleSheet(Theme::curseForgeButtonStyle());
         else installBtn->setStyleSheet(
                 QString("QPushButton{background:transparent;color:%1;border:1px solid %1;"
                         "border-radius:8px;font-weight:bold;}"
-                        "QPushButton:hover{background:%1;color:#0A0A0A;}").arg(kAccent));
+                        "QPushButton:hover{background:%1;color:#0A0A0A;}").arg(Theme::accent().name()));
 
         // Копируем mod для лямбды
         connect(installBtn, &QPushButton::clicked, this, [this, mod, isModpack]() {
@@ -329,7 +345,7 @@ void CurseForgeWindow::addCards(const QVector<CFMod>& mods,
             webBtn->setStyleSheet(
                 QString("QPushButton{background:transparent;color:%1;border:1px solid %1;"
                         "border-radius:6px;font-size:11px;}"
-                        "QPushButton:hover{background:%1;color:#0A0A0A;}").arg(kAccentCF));
+                        "QPushButton:hover{background:%1;color:#0A0A0A;}").arg(Theme::accentCurseForge().name()));
             connect(webBtn, &QPushButton::clicked, this, [url = mod.websiteUrl](){
                 QDesktopServices::openUrl(QUrl(url));
             });

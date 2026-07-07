@@ -14,7 +14,6 @@
 #include <QtWidgets/QSizePolicy>
 #include <QtWidgets/QLabel>
 #include <QtWidgets/QFrame>
-#include "darktheme.h"
 
 QT_BEGIN_NAMESPACE
 

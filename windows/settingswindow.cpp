@@ -1,5 +1,4 @@
 #include "settingswindow.h"
-#include "darktheme.h"
 #include <QVBoxLayout>
 #include <QCheckBox>
 #include <QSlider>
@@ -9,12 +8,14 @@
 #include <QFileDialog>
 #include <QSettings>
 
+#include "../ui/theme.h"
+
 SettingsWindow::SettingsWindow(QWidget* parent)
     : QDialog(parent)
 {
     setWindowTitle("Настройки");
     resize(480, 420);
-    setStyleSheet(DarkTheme::dialogStyle() + R"(
+    setStyleSheet(Theme::dialogStyle() + R"(
         QCheckBox { color: #E8EAED; }
         QCheckBox::indicator {
             width: 18px; height: 18px;

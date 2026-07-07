@@ -1,6 +1,5 @@
 #include "createmodpackwindow.h"
 #include "settingswindow.h"
-#include "darktheme.h"
 #include "../ui/windowframe.h"
 #include "../ui/theme.h"
 
@@ -79,7 +78,7 @@ CreateModpackWindow::CreateModpackWindow(QWidget* parent)
     createButton =
         new QPushButton(
             "Создать сборку");
-    createButton->setStyleSheet(DarkTheme::accentButton());
+    createButton->setStyleSheet(Theme::accentButtonStyle());
     createButton->setMinimumHeight(40);
 
     layout->addWidget(createButton);

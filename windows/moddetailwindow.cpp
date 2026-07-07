@@ -1,5 +1,4 @@
 #include "moddetailwindow.h"
-#include "darktheme.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -15,7 +14,7 @@
 #include <QPixmap>
 #include <QDebug>
 
-using namespace DarkTheme;
+#include "../ui/theme.h"
 
 ModDetailsWindow::ModDetailsWindow(
     const Mod& mod,
@@ -25,7 +24,7 @@ ModDetailsWindow::ModDetailsWindow(
 {
     resize(1000, 750);
     setWindowTitle(mod.name);
-    setStyleSheet(dialogStyle());
+    setStyleSheet(Theme::dialogStyle());
 
     api = new ModrithAPI(this);
     manager = new QNetworkAccessManager(this);
@@ -49,7 +48,7 @@ ModDetailsWindow::ModDetailsWindow(
     iconLabel->setScaledContents(true);
     iconLabel->setStyleSheet(QString(
                                  "border-radius: 12px; border: 1px solid %1; background: %2;")
-                                 .arg(kBorder, kPanel));
+                                 .arg(Theme::border().name(), Theme::panel().name()));
 
     QVBoxLayout* infoLayout =
         new QVBoxLayout();
@@ -59,30 +58,30 @@ ModDetailsWindow::ModDetailsWindow(
     titleLabel =
         new QLabel(
             "<h1>" + mod.name + "</h1>");
-    titleLabel->setStyleSheet(QString("font-size: 26px; color: %1;").arg(kText));
+    titleLabel->setStyleSheet(QString("font-size: 26px; color: %1;").arg(Theme::text().name()));
 
     authorLabel =
         new QLabel(
             "Автор: " + mod.author);
-    authorLabel->setStyleSheet(QString("color: %1;").arg(kTextDim));
+    authorLabel->setStyleSheet(QString("color: %1;").arg(Theme::textDim().name()));
 
     downloadsLabel =
         new QLabel(
             "⬇ " +
             QString::number(mod.downloads));
-    downloadsLabel->setStyleSheet(QString("color: %1;").arg(kTextDim));
+    downloadsLabel->setStyleSheet(QString("color: %1;").arg(Theme::textDim().name()));
 
     categoriesLabel =
         new QLabel();
     categoriesLabel->setWordWrap(true);
-    categoriesLabel->setStyleSheet(QString("color: %1;").arg(kTextDim));
+    categoriesLabel->setStyleSheet(QString("color: %1;").arg(Theme::textDim().name()));
 
     versionsLabel =
         new QLabel(
             "Версии: " +
             mod.versions.join(", "));
     versionsLabel->setWordWrap(true);
-    versionsLabel->setStyleSheet(QString("color: %1;").arg(kTextDim));
+    versionsLabel->setStyleSheet(QString("color: %1;").arg(Theme::textDim().name()));
 
     infoLayout->addWidget(titleLabel);
     infoLayout->addWidget(authorLabel);
@@ -108,7 +107,7 @@ ModDetailsWindow::ModDetailsWindow(
     descriptionBrowser->setStyleSheet(QString(
                                           "QTextBrowser { background-color: %1; border: 1px solid %2;"
                                           " border-radius: 10px; padding: 12px; color: %3; }")
-                                          .arg(kPanel, kBorder, kText));
+                                          .arg(Theme::panel().name(), Theme::border().name(), Theme::text().name()));
 
     // =========================
     // GALLERY
@@ -141,7 +140,7 @@ ModDetailsWindow::ModDetailsWindow(
                                      "QPushButton { background-color: %1; color: #0A0A0A; border: none;"
                                      " border-radius: 10px; font-weight: bold; font-size: 15px; }"
                                      "QPushButton:hover { background-color: #15c25e; }")
-                                     .arg(kAccent));
+                                     .arg(Theme::accent().name()));
 
     connect(installButton, &QPushButton::clicked, this, [this]() {
         emit installRequested(currentMod);

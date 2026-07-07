@@ -5,6 +5,7 @@
 #include <QUrl>
 #include "../curseforgeclient.h"
 
+class WindowFrame;
 class QLineEdit;
 class QPushButton;
 class QScrollArea;
@@ -44,6 +45,7 @@ private:
 
     static QString formatCount(quint64 v);
 
+    WindowFrame* frame = nullptr;
     CurseForgeClient* m_cf   = nullptr;
     SettingsWindow*   m_settings = nullptr;
     QNetworkAccessManager* m_nam = nullptr;
