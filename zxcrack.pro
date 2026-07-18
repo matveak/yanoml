@@ -3,29 +3,45 @@ QT += widgets network networkauth svg
 CONFIG += c++17
 
 SOURCES += \
-    createmodpackwindow.cpp \
+    JavaUtils.cpp \
+    MinecraftLauncher.cpp \
+    Zip.cpp \
     curseforgeclient.cpp \
-    curseforgewindow.cpp \
     main.cpp \
-    mainwindow.cpp \
     minecraftdownloader.cpp \
-    moddetailwindow.cpp \
     modrinthapi.cpp \
-    modwindow.cpp \
-    settingswindow.cpp
+    windows/createmodpackwindow.cpp \
+    windows/curseforgewindow.cpp \
+    windows/mainwindow.cpp \
+    windows/moddetailwindow.cpp \
+    windows/modwindow.cpp \
+    windows/settingswindow.cpp \
+    windows/solitaireGame.cpp \
+    ui/theme.cpp \
+    ui/titlebar.cpp \
+    ui/windowframe.cpp
 
 HEADERS += \
-    createmodpackwindow.h \
+    JavaUtils.h \
+    MinecraftLauncher.h \
+    Zip.h \
     curseforgeclient.h \
-    curseforgewindow.h \
-    darktheme.h \
-    mainwindow.h \
     minecraftdownloader.h \
-    moddetailwindow.h \
     modrinthapi.h \
-    modwindow.h \
-    settingswindow.h \
-    ui_mainwindow.h
+    windows/createmodpackwindow.h \
+    windows/curseforgewindow.h \
+    windows/mainwindow.h \
+    windows/moddetailwindow.h \
+    windows/modwindow.h \
+    windows/settingswindow.h \
+    windows/solitaireGame.h \
+    windows/ui_mainwindow.h \
+    ui/theme.h \
+    ui/titlebar.h \
+    ui/windowframe.h
+
+RESOURCES += \
+    resources.qrc
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
