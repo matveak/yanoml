@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
-set(CMAKE_PREFIX_PATH "C:/Qt/6.10.2/msvc2022_64")
+set(CMAKE_PREFIX_PATH "C:/Qt/6.11.1/mingw_64")
 
 find_package(Qt6 COMPONENTS
         Core
