@@ -13,7 +13,6 @@
 #include <QMap>
 #include <QTimer>
 #include <QTextEdit>
-#include "solitaireGame.h"
 #include  <QComboBox>
 #include "../minecraftdownloader.h"
 #include "settingswindow.h"
@@ -45,7 +44,6 @@ private slots:
     void on_SettingsButton_clicked();
     void on_PickAccountButton_clicked();
     void on_InstallerButton_clicked();
-    void on_solitaireGameButton_clicked();
 
 private:
     QWidget      *centralwidget;
@@ -66,7 +64,6 @@ private:
     QVBoxLayout  *rightPanelLayout;
 
     WindowFrame* frame = nullptr;
-    SolitaireGame*       m_game           = nullptr;
     QProgressBar*        progressBar      = nullptr;
     QSystemTrayIcon*     trayIcon         = nullptr;
     SettingsWindow*      settingsWindow   = nullptr;

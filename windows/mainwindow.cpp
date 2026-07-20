@@ -384,8 +384,6 @@ void MainWindow::setupConnections()
     connect(downloader, &MinecraftDownloader::neoforgeVersionReceived,
             this, &MainWindow::onNeoForgeVersionReceived);
 
-    connect(SolitaireGameButton, &QPushButton::clicked, this, &MainWindow::on_solitaireGameButton_clicked);
-
     connect(downloader, &MinecraftDownloader::instanceCreated, this,
             [this](const QString& path)
             {
@@ -414,17 +412,6 @@ void MainWindow::setupConnections()
                 progressBar->show();
                 progressBar->setValue(percent);
             });
-}
-
-void MainWindow::on_solitaireGameButton_clicked() {
-    if (!m_game) {
-        m_game = new SolitaireGame(this);
-        m_game->setAttribute(Qt::WA_DeleteOnClose);
-        connect(m_game, &QObject::destroyed, this, [this]() { m_game = nullptr; });
-    }
-    m_game->show();
-    m_game->raise();
-    m_game->activateWindow();
 }
 
 // ==================== Installer ====================
