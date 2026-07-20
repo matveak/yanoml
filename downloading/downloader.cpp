@@ -59,6 +59,7 @@ Downloader::Downloader(Downloader &other) {
 	this->manager = other.manager;
 }
 
+
 void Downloader::startNextDownload()
 {
 	while (activeDownloads < MaxParallelDownloads &&

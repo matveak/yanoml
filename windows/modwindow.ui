@@ -1,18 +1,229 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>modwindow</class>
- <widget class="QWidget" name="modwindow">
+ <class>CurseForgeContent</class>
+ <widget class="QWidget" name="CurseForgeContent">
   <property name="geometry">
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1572</width>
-    <height>968</height>
+    <width>1300</width>
+    <height>860</height>
    </rect>
   </property>
-  <property name="windowTitle">
-   <string>modwindow</string>
-  </property>
+  <layout class="QVBoxLayout" name="mainLayout">
+   <property name="leftMargin"><number>16</number></property>
+   <property name="topMargin"><number>16</number></property>
+   <property name="rightMargin"><number>16</number></property>
+   <property name="bottomMargin"><number>16</number></property>
+   <property name="spacing"><number>12</number></property>
+   <item>
+    <layout class="QHBoxLayout" name="headerLayout">
+     <item>
+      <widget class="QLabel" name="logoLabel">
+       <property name="text">
+        <string>CurseForge</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="headerSpacer">
+       <property name="orientation"><enum>Qt::Horizontal</enum></property>
+       <property name="sizeType"><enum>QSizePolicy::Fixed</enum></property>
+       <property name="sizeHint">
+        <size>
+         <width>12</width>
+         <height>0</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+     <item>
+      <widget class="QLabel" name="subtitleLabel">
+       <property name="text">
+        <string>Моды и модпаки для Minecraft</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QProgressBar" name="progressBar">
+     <property name="minimum"><number>0</number></property>
+     <property name="maximum"><number>0</number></property>
+     <property name="value"><number>-1</number></property>
+     <property name="textVisible"><bool>false</bool></property>
+     <property name="minimumSize">
+      <size><width>0</width><height>6</height></size>
+     </property>
+     <property name="maximumSize">
+      <size><width>16777215</width><height>6</height></size>
+     </property>
+     <property name="visible"><bool>false</bool></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="statusLabel">
+     <property name="text">
+      <string/>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QTabWidget" name="tabWidget">
+     <property name="currentIndex"><number>0</number></property>
+     <widget class="QWidget" name="modsTab">
+      <attribute name="title">
+       <string>⚙ Моды</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="modsTabLayout">
+       <property name="leftMargin"><number>12</number></property>
+       <property name="topMargin"><number>12</number></property>
+       <property name="rightMargin"><number>12</number></property>
+       <property name="bottomMargin"><number>12</number></property>
+       <property name="spacing"><number>10</number></property>
+       <item>
+        <layout class="QHBoxLayout" name="modSearchRow">
+         <item>
+          <widget class="QLineEdit" name="modSearchEdit">
+           <property name="placeholderText">
+            <string>Поиск модов на CurseForge...</string>
+           </property>
+           <property name="minimumSize">
+            <size><width>0</width><height>38</height></size>
+           </property>
+           <property name="maximumSize">
+            <size><width>16777215</width><height>38</height></size>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QComboBox" name="modVersionCombo">
+           <property name="minimumSize">
+            <size><width>150</width><height>0</height></size>
+           </property>
+           <property name="maximumSize">
+            <size><width>150</width><height>16777215</height></size>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QComboBox" name="modLoaderCombo">
+           <property name="minimumSize">
+            <size><width>150</width><height>0</height></size>
+           </property>
+           <property name="maximumSize">
+            <size><width>150</width><height>16777215</height></size>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="modSearchButton">
+           <property name="text">
+            <string>Найти</string>
+           </property>
+           <property name="minimumSize">
+            <size><width>0</width><height>38</height></size>
+           </property>
+           <property name="maximumSize">
+            <size><width>16777215</width><height>38</height></size>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QScrollArea" name="modScrollArea">
+         <property name="frameShape"><enum>QFrame::NoFrame</enum></property>
+         <property name="widgetResizable"><bool>true</bool></property>
+         <widget class="QWidget" name="modScrollContent">
+          <property name="geometry">
+           <rect><x>0</x><y>0</y><width>1250</width><height>600</height></rect>
+          </property>
+          <layout class="QVBoxLayout" name="modCardsLayout">
+           <property name="spacing"><number>10</number></property>
+           <property name="leftMargin"><number>0</number></property>
+           <property name="topMargin"><number>0</number></property>
+           <property name="rightMargin"><number>0</number></property>
+           <property name="bottomMargin"><number>0</number></property>
+          </layout>
+         </widget>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="modpacksTab">
+      <attribute name="title">
+       <string>📦 Модпаки</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="modpacksTabLayout">
+       <property name="leftMargin"><number>12</number></property>
+       <property name="topMargin"><number>12</number></property>
+       <property name="rightMargin"><number>12</number></property>
+       <property name="bottomMargin"><number>12</number></property>
+       <property name="spacing"><number>10</number></property>
+       <item>
+        <layout class="QHBoxLayout" name="packSearchRow">
+         <item>
+          <widget class="QLineEdit" name="packSearchEdit">
+           <property name="placeholderText">
+            <string>Поиск модпаков (ATM, FTB, Revelation...)</string>
+           </property>
+           <property name="minimumSize">
+            <size><width>0</width><height>38</height></size>
+           </property>
+           <property name="maximumSize">
+            <size><width>16777215</width><height>38</height></size>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QComboBox" name="packVersionCombo">
+           <property name="minimumSize">
+            <size><width>150</width><height>0</height></size>
+           </property>
+           <property name="maximumSize">
+            <size><width>150</width><height>16777215</height></size>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="packSearchButton">
+           <property name="text">
+            <string>Найти</string>
+           </property>
+           <property name="minimumSize">
+            <size><width>0</width><height>38</height></size>
+           </property>
+           <property name="maximumSize">
+            <size><width>16777215</width><height>38</height></size>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QScrollArea" name="packScrollArea">
+         <property name="frameShape"><enum>QFrame::NoFrame</enum></property>
+         <property name="widgetResizable"><bool>true</bool></property>
+         <widget class="QWidget" name="packScrollContent">
+          <property name="geometry">
+           <rect><x>0</x><y>0</y><width>1250</width><height>600</height></rect>
+          </property>
+          <layout class="QVBoxLayout" name="packCardsLayout">
+           <property name="spacing"><number>10</number></property>
+           <property name="leftMargin"><number>0</number></property>
+           <property name="topMargin"><number>0</number></property>
+           <property name="rightMargin"><number>0</number></property>
+           <property name="bottomMargin"><number>0</number></property>
+          </layout>
+         </widget>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+  </layout>
  </widget>
  <resources/>
  <connections/>
