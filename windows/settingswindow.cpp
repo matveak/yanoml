@@ -139,15 +139,3 @@ SettingsWindow::SettingsWindow(QWidget* parent)
         accept();
     });
 }
-
-QString SettingsWindow::username() const
-{
-    QString name = settings.value("username", "Player").toString().trimmed();
-    return name.isEmpty() ? "Player" : name;
-}
-
-// остальные методы без изменений
-bool SettingsWindow::showSnapshots() const { return settings.value("snapshots", false).toBool(); }
-int SettingsWindow::ramAmount() const { return settings.value("minecraftRam", 0).toInt(); }
-QString SettingsWindow::minecraftPath() const { return settings.value("minecraftPath").toString(); }
-QString SettingsWindow::javaPath() const { return settings.value("javaPath").toString() + "/bin/javaw.exe"; }

@@ -16,12 +16,6 @@ class SettingsWindow : public QDialog{
 public:
     explicit SettingsWindow(QWidget* parent = nullptr);
 
-    bool showSnapshots() const;
-    int ramAmount() const;
-    QString minecraftPath() const;
-    QString javaPath() const;
-    QString username() const;           // ← Новый метод
-
 signals:
     void settingsChanged();
 
