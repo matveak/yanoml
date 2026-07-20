@@ -30,7 +30,36 @@
 #include <QClipboard>
 #include <QFile>
 #include <QScreen>
+#include <QPainter>
+#include <QPixmap>
+#include <QAction>
+#include <QColor>
 
+
+// ==================== Helpers ====================
+
+// Небольшая цветная иконка-«бейдж» с буквой (как значок платформы в селекторе)
+static QIcon makePlatformIcon(const QColor &color, const QString &letter)
+{
+    const int size = 20;
+    QPixmap pixmap(size, size);
+    pixmap.fill(Qt::transparent);
+
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(color);
+    painter.drawRoundedRect(0, 0, size, size, 6, 6);
+
+    QFont font = painter.font();
+    font.setBold(true);
+    font.setPointSize(10);
+    painter.setFont(font);
+    painter.setPen(Qt::white);
+    painter.drawText(QRect(0, 0, size, size), Qt::AlignCenter, letter);
+
+    return QIcon(pixmap);
+}
 
 // ==================== MainWindow ====================
 
@@ -139,26 +168,43 @@ void MainWindow::setupUI() {
     };
     rightPanelLayout->addWidget(makeSep());
 
-    // ─── Ряд 1: Modrinth + CurseForge ──────────────────────────
-    QHBoxLayout *platformRow = new QHBoxLayout();
-    platformRow->setSpacing(8);
-    platformRow->setContentsMargins(0, 0, 0, 0);
+    // ─── Источник модов (слитая кнопка-селектор) ────────────────
+    PlatformButton = new QPushButton(this);
+    PlatformButton->setObjectName("PlatformButton");
+    PlatformButton->setMinimumHeight(42);
+    PlatformButton->setCursor(Qt::PointingHandCursor);
+    PlatformButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    PlatformButton->setLayoutDirection(Qt::LeftToRight);
 
-    ModPlatformButton = new QPushButton("Modrinth");
-    ModPlatformButton->setObjectName("ModPlatformButton");
-    ModPlatformButton->setMinimumHeight(42);
-    ModPlatformButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    platformRow->addWidget(ModPlatformButton);
+    QMenu *platformMenu = new QMenu(PlatformButton);
+    platformMenu->setObjectName("PlatformMenu");
 
-    CurseForgeButton = new QPushButton("CurseForge");
-    CurseForgeButton->setObjectName("CurseForgeButton");
-    CurseForgeButton->setMinimumHeight(42);
-    CurseForgeButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    platformRow->addWidget(CurseForgeButton);
+    QAction *modrinthAction = platformMenu->addAction(
+        makePlatformIcon(QColor("#1BD96A"), "M"), "Modrinth");
+    QAction *curseforgeAction = platformMenu->addAction(
+        makePlatformIcon(QColor("#F16436"), "C"), "CurseForge");
 
-    rightPanelLayout->addLayout(platformRow);
+    auto selectPlatform = [this](const QColor &color, const QString &letter, const QString &name) {
+        PlatformButton->setIcon(makePlatformIcon(color, letter));
+        PlatformButton->setText("  " + name);
+    };
 
-    // ─── Ряд 2: Модпаки и игры ─────────────────────────────────
+    connect(modrinthAction, &QAction::triggered, this, [this, selectPlatform]() {
+        selectPlatform(QColor("#1BD96A"), "M", "Modrinth");
+        on_ModPlatformButton_clicked();
+    });
+    connect(curseforgeAction, &QAction::triggered, this, [this, selectPlatform]() {
+        selectPlatform(QColor("#F16436"), "C", "CurseForge");
+        on_CurseForgeButton_clicked();
+    });
+
+    PlatformButton->setMenu(platformMenu);
+    PlatformButton->setIconSize(QSize(20, 20));
+    selectPlatform(QColor("#1BD96A"), "M", "Modrinth");
+
+    rightPanelLayout->addWidget(PlatformButton);
+
+    // ─── Ряд: Модпаки и игры ─────────────────────────────────
     QHBoxLayout *gamesRow = new QHBoxLayout();
     gamesRow->setSpacing(8);
     gamesRow->setContentsMargins(0, 0, 0, 0);

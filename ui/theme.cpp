@@ -1,5 +1,10 @@
 #include "theme.h"
 
+#include <QPainter>
+#include <QPixmap>
+#include <QFont>
+#include <QPen>
+
 // ==================== Static Color Definitions ====================
 
 QColor Theme::s_background(0x16, 0x18, 0x1C);
@@ -52,7 +57,7 @@ QString Theme::dialogStyle()
         QLineEdit {
             background-color: %3;
             border: 1px solid %4;
-            border-radius: 8px;
+            border-radius: 10px;
             padding: 6px 12px;
             color: %2;
         }
@@ -69,7 +74,7 @@ QString Theme::dialogStyle()
         QComboBox {
             background-color: %3;
             border: 1px solid %4;
-            border-radius: 8px;
+            border-radius: 10px;
             padding: 6px 10px;
             color: %2;
             min-height: 28px;
@@ -90,7 +95,7 @@ QString Theme::dialogStyle()
             background-color: %3;
             color: %2;
             border: 1px solid %4;
-            border-radius: 8px;
+            border-radius: 10px;
             padding: 8px 16px;
             font-size: 13px;
         }
@@ -143,7 +148,7 @@ QString Theme::dialogStyle()
         }
         QTabWidget::pane {
             border: 1px solid %4;
-            border-radius: 8px;
+            border-radius: 12px;
             background-color: %1;
         }
         QTabBar::tab {
@@ -180,7 +185,7 @@ QString Theme::accentButtonStyle()
             background-color: %1;
             color: #0A0A0A;
             border: none;
-            border-radius: 8px;
+            border-radius: 10px;
             font-weight: bold;
             padding: 8px 16px;
         }
@@ -200,7 +205,7 @@ QString Theme::curseForgeButtonStyle()
             background-color: %1;
             color: white;
             border: none;
-            border-radius: 8px;
+            border-radius: 10px;
             font-weight: bold;
             padding: 8px 16px;
         }
@@ -211,4 +216,60 @@ QString Theme::curseForgeButtonStyle()
             background-color: #C04F26;
         }
     )").arg(accentCurseForge().name());
+}
+
+// ==================== Icons ====================
+
+QIcon Theme::windowControlIcon(const QString& kind, const QColor& color)
+{
+    const int size = 16;
+    QPixmap pixmap(size, size);
+    pixmap.fill(Qt::transparent);
+
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing);
+
+    QPen pen(color);
+    pen.setWidthF(1.4);
+    pen.setCapStyle(Qt::RoundCap);
+    painter.setPen(pen);
+    painter.setBrush(Qt::NoBrush);
+
+    if (kind == "minimize") {
+        painter.drawLine(QPointF(4, 11), QPointF(12, 11));
+    } else if (kind == "maximize") {
+        painter.drawRoundedRect(QRectF(3.5, 3.5, 9, 9), 2, 2);
+    } else if (kind == "restore") {
+        painter.drawRoundedRect(QRectF(5.5, 3.5, 7, 7), 2, 2);
+        painter.drawLine(QPointF(3.5, 5.5), QPointF(3.5, 11.5));
+        painter.drawLine(QPointF(3.5, 11.5), QPointF(9.5, 11.5));
+        painter.drawLine(QPointF(9.5, 11.5), QPointF(9.5, 10.5));
+    } else if (kind == "close") {
+        painter.drawLine(QPointF(4, 4), QPointF(12, 12));
+        painter.drawLine(QPointF(12, 4), QPointF(4, 12));
+    }
+
+    return QIcon(pixmap);
+}
+
+QIcon Theme::platformIcon(const QColor& color, const QString& letter)
+{
+    const int size = 20;
+    QPixmap pixmap(size, size);
+    pixmap.fill(Qt::transparent);
+
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(color);
+    painter.drawRoundedRect(0, 0, size, size, 6, 6);
+
+    QFont font = painter.font();
+    font.setBold(true);
+    font.setPointSize(10);
+    painter.setFont(font);
+    painter.setPen(Qt::white);
+    painter.drawText(QRect(0, 0, size, size), Qt::AlignCenter, letter);
+
+    return QIcon(pixmap);
 }

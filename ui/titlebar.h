@@ -28,6 +28,9 @@ protected:
 	void mouseDoubleClickEvent(QMouseEvent* event) override;
 
 private:
+	void updateMaximizeIcon();
+
+private:
 	QWidget* m_window;
 
 	QLabel* m_title;
@@ -37,6 +40,8 @@ private:
 
 	QHBoxLayout* m_leftLayout;
 	QHBoxLayout* m_rightLayout;
+
+	QPushButton* m_maximizeButton = nullptr;
 
 	QPoint m_dragPosition;
 };

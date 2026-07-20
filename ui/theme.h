@@ -2,6 +2,7 @@
 
 #include <QColor>
 #include <QString>
+#include <QIcon>
 
 class Theme
 {
@@ -26,6 +27,14 @@ public:
 	static QString accentButtonStyle();
 
 	static QString curseForgeButtonStyle();
+
+	// ===== Иконки (рисуются вручную, не зависят от шрифта) =====
+
+	// Значки кнопок управления окном: "minimize", "maximize", "restore", "close"
+	static QIcon windowControlIcon(const QString& kind, const QColor& color);
+
+	// Маленький цветной бейдж с буквой (индикатор платформы: M — Modrinth, C — CurseForge)
+	static QIcon platformIcon(const QColor& color, const QString& letter);
 
 	// ===== Изменение темы =====
 

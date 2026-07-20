@@ -5,6 +5,8 @@
 #include <QLabel>
 #include <QMouseEvent>
 #include <QPushButton>
+#include <QSize>
+#include <QColor>
 
 // ==================== Constructor ====================
 
@@ -13,22 +15,48 @@ TitleBar::TitleBar(QWidget *window, QWidget *parent)
       m_window(window)
 {
     setObjectName("titleBar");
-    setFixedHeight(36);
+    setFixedHeight(32);
+    setAttribute(Qt::WA_StyledBackground, true);
+    setStyleSheet(QString(
+        "#titleBar {"
+        "    background: transparent;"
+        "    border: none;"
+        "    border-top-left-radius: 14px;"
+        "    border-top-right-radius: 14px;"
+        "    border-bottom: 1px solid rgba(255, 255, 255, 14);"
+        "}"
+    ));
 
     auto *mainLayout = new QHBoxLayout(this);
-    mainLayout->setContentsMargins(8, 4, 8, 4);
-    mainLayout->setSpacing(6);
+    mainLayout->setContentsMargins(10, 0, 6, 0);
+    mainLayout->setSpacing(8);
 
-    // ── Левая часть ────────────────────────────────────────────────────
+    // ── Левая часть (иконка приложения / доп. виджеты) ────────────────────
     m_leftContainer = new QWidget(this);
     m_leftContainer->setObjectName("leftContainer");
     m_leftLayout = new QHBoxLayout(m_leftContainer);
     m_leftLayout->setContentsMargins(0, 0, 0, 0);
-    m_leftLayout->setSpacing(4);
+    m_leftLayout->setSpacing(6);
+
+    auto *appIcon = new QLabel(this);
+    appIcon->setFixedSize(18, 18);
+    appIcon->setAlignment(Qt::AlignCenter);
+    appIcon->setPixmap(Theme::platformIcon(QColor("#8B5CF6"), "Y").pixmap(18, 18));
+    m_leftLayout->addWidget(appIcon);
 
     // ── Заголовок ──────────────────────────────────────────────────────
     m_title = new QLabel(this);
-    m_title->setAlignment(Qt::AlignCenter);
+    m_title->setObjectName("titleBarLabel");
+    m_title->setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
+    m_title->setStyleSheet(QString(
+        "QLabel#titleBarLabel {"
+        "    background: transparent;"
+        "    color: %1;"
+        "    font-size: 12px;"
+        "    font-weight: 600;"
+        "    letter-spacing: 0.2px;"
+        "}"
+    ).arg(Theme::textDim().name()));
 
     // ── Правая часть (кнопки управления окном) ────────────────────────
     m_rightContainer = new QWidget(this);
@@ -37,84 +65,71 @@ TitleBar::TitleBar(QWidget *window, QWidget *parent)
     m_rightLayout->setContentsMargins(0, 0, 0, 0);
     m_rightLayout->setSpacing(2);
 
-    auto *minimizeButton = new QPushButton("━");
-    auto *maximizeButton = new QPushButton("□");
-    auto *closeButton    = new QPushButton("✕");
+    auto *minimizeButton = new QPushButton();
+    m_maximizeButton      = new QPushButton();
+    auto *closeButton    = new QPushButton();
 
-    QList<QPushButton*> buttons = { minimizeButton, maximizeButton, closeButton };
+    QList<QPushButton*> buttons = { minimizeButton, m_maximizeButton, closeButton };
+
+    const QString baseStyle = QString(
+        "QPushButton { "
+        "    border: none; "
+        "    border-radius: 6px; "
+        "    background: transparent; "
+        "}"
+        "QPushButton:hover { "
+        "    background: rgba(255, 255, 255, 26); "
+        "}"
+        "QPushButton:pressed { "
+        "    background: rgba(255, 255, 255, 42); "
+        "}"
+    );
 
     for (QPushButton *button : buttons) {
-        button->setFixedSize(36, 30);  // Увеличили размер кнопок
+        button->setFixedSize(30, 24);
+        button->setIconSize(QSize(12, 12));
         button->setCursor(Qt::PointingHandCursor);
         button->setFlat(true);
-
-        // Делаем символы жирнее через стиль
-        button->setStyleSheet(QString(
-            "QPushButton { "
-            "    border: none; "
-            "    border-radius: 6px; "
-            "    background: transparent; "
-            "    color: %1; "
-            "    font-weight: 900; "      // Максимальная жирность
-            "    font-size: 16px; "       // Увеличенный размер шрифта
-            "    line-height: 1; "        // Компактная высота строки
-            "}"
-            "QPushButton:hover { "
-            "    background: %2; "
-            "}"
-            "QPushButton:pressed { "
-            "    background: %3; "
-            "}"
-        ).arg(Theme::text().name(),
-              Theme::panelHighlight().name(),
-              Theme::panel().name()));
-
+        button->setStyleSheet(baseStyle);
         m_rightLayout->addWidget(button);
     }
 
+    minimizeButton->setIcon(Theme::windowControlIcon("minimize", Theme::text()));
+
     // ── Layout ─────────────────────────────────────────────────────────
     mainLayout->addWidget(m_leftContainer);
-    mainLayout->addStretch();
-    mainLayout->addWidget(m_title);
-    mainLayout->addStretch();
+    mainLayout->addWidget(m_title, 1);
     mainLayout->addWidget(m_rightContainer);
 
     // ─ Connections ────────────────────────────────────────────────────
     connect(closeButton, &QPushButton::clicked, m_window, &QWidget::close);
     connect(minimizeButton, &QPushButton::clicked, m_window, &QWidget::showMinimized);
 
-    connect(maximizeButton, &QPushButton::clicked, this, [this]() {
+    connect(m_maximizeButton, &QPushButton::clicked, this, [this]() {
         if (m_window->isMaximized())
             m_window->showNormal();
         else
             m_window->showMaximized();
+        updateMaximizeIcon();
     });
 
     // ── Специальный стиль для кнопки закрытия (красный при наведении) ─
-    closeButton->setStyleSheet(QString(
+    closeButton->setIcon(Theme::windowControlIcon("close", Theme::text()));
+    closeButton->setStyleSheet(
         "QPushButton { "
         "    border: none; "
         "    border-radius: 6px; "
         "    background: transparent; "
-        "    color: %1; "
-        "    font-weight: 900; "      // Максимальная жирность
-        "    font-size: 16px; "       // Увеличенный размер
-        "    line-height: 1; "
         "}"
         "QPushButton:hover { "
         "    background: #E81123; "
-        "    color: white; "
         "}"
         "QPushButton:pressed { "
         "    background: #C50F1F; "
-        "    color: white; "
         "}"
-    ).arg(Theme::text().name()));
+    );
 
-    // Альтернатива: можно использовать более толстые символы
-    // minimizeButton->setText("━");  // более жирное тире
-    // maximizeButton->setText("");  // более жирный квадрат
-    // closeButton->setText("✖");     // более жирный крестик
+    updateMaximizeIcon();
 }
 
 // ==================== Getters ====================
@@ -129,6 +144,17 @@ QHBoxLayout *TitleBar::rightLayout() const  { return m_rightLayout; }
 void TitleBar::setTitle(const QString &title)
 {
     m_title->setText(title);
+}
+
+// ==================== Private Methods ====================
+
+void TitleBar::updateMaximizeIcon()
+{
+    if (!m_maximizeButton)
+        return;
+
+    const QString kind = m_window->isMaximized() ? "restore" : "maximize";
+    m_maximizeButton->setIcon(Theme::windowControlIcon(kind, Theme::text()));
 }
 
 // ==================== Event Handlers ====================
@@ -168,6 +194,7 @@ void TitleBar::mouseDoubleClickEvent(QMouseEvent *event)
             m_window->showNormal();
         else
             m_window->showMaximized();
+        updateMaximizeIcon();
     }
     QWidget::mouseDoubleClickEvent(event);
 }

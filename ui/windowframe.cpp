@@ -36,12 +36,18 @@ void WindowFrame::setupUi()
         #windowFrame {
             background: %1;
             border: 1px solid %2;
-            border-radius: 10px;
+            border-radius: 14px;
+        }
+        #titleBar {
+            background: transparent;
+            border: none;
+            border-top-left-radius: 14px;
+            border-top-right-radius: 14px;
         }
         #contentWidget {
             background: %1;
-            border-bottom-left-radius: 10px;
-            border-bottom-right-radius: 10px;
+            border-bottom-left-radius: 14px;
+            border-bottom-right-radius: 14px;
         }
     )")
     .arg(Theme::background().name())

@@ -1,7 +1,9 @@
 #include "curseforgewindow.h"
 #include "settingswindow.h"
+#include "modwindow.h"
 #include "../ui/theme.h"
 #include "../ui/windowframe.h"
+#include "../ui/titlebar.h"
 #include <QHBoxLayout>
 #include <QLineEdit>
 #include <QPushButton>
@@ -19,6 +21,8 @@
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QPixmap>
+#include <QSize>
+#include <QColor>
 
 // ==================== Constants ====================
 
@@ -78,6 +82,53 @@ CurseForgeWindow::CurseForgeWindow(QWidget* parent)
     // Window frame
     frame = new WindowFrame(this);
     frame->setTitle("CurseForge — Моды и Модпаки");
+
+    // ── Переключатель источника модов — прямо в шапке окна ───────────
+    // (слева от кнопок свернуть/закрыть, без выпадающего меню)
+    {
+        auto* switcherLayout = frame->titleBar()->rightLayout();
+
+        const QString switchBtnStyle =
+            "QPushButton { border: none; border-radius: 6px; background: transparent; }"
+            "QPushButton:hover { background: rgba(255, 255, 255, 26); }"
+            "QPushButton:pressed { background: rgba(255, 255, 255, 42); }"
+            "QPushButton:disabled { background: rgba(241, 100, 54, 40); }";
+
+        auto* modrinthBtn = new QPushButton(frame->titleBar());
+        modrinthBtn->setIcon(Theme::platformIcon(QColor("#1BD96A"), "M"));
+        modrinthBtn->setIconSize(QSize(18, 18));
+        modrinthBtn->setFixedSize(28, 26);
+        modrinthBtn->setCursor(Qt::PointingHandCursor);
+        modrinthBtn->setFlat(true);
+        modrinthBtn->setToolTip("Открыть Modrinth");
+        modrinthBtn->setStyleSheet(switchBtnStyle);
+
+        auto* curseforgeBtn = new QPushButton(frame->titleBar());
+        curseforgeBtn->setIcon(Theme::platformIcon(QColor("#F16436"), "C"));
+        curseforgeBtn->setIconSize(QSize(18, 18));
+        curseforgeBtn->setFixedSize(28, 26);
+        curseforgeBtn->setFlat(true);
+        curseforgeBtn->setEnabled(false); // мы уже находимся в CurseForge
+        curseforgeBtn->setToolTip("CurseForge — текущий раздел");
+        curseforgeBtn->setStyleSheet(switchBtnStyle);
+
+        connect(modrinthBtn, &QPushButton::clicked, this, [this]() {
+            ModWindow* window = new ModWindow(parentWidget());
+            window->setSettingsWindow(m_settings);
+            window->setAttribute(Qt::WA_DeleteOnClose);
+            window->exec();
+            close();
+        });
+
+        switcherLayout->insertWidget(0, modrinthBtn);
+        switcherLayout->insertWidget(1, curseforgeBtn);
+
+        auto* sep = new QFrame(frame->titleBar());
+        sep->setFixedWidth(1);
+        sep->setFixedHeight(16);
+        sep->setStyleSheet(QString("background-color: %1;").arg(Theme::border().name()));
+        switcherLayout->insertWidget(2, sep);
+    }
 
     auto* rootLayout = new QVBoxLayout(this);
     rootLayout->setContentsMargins(0, 0, 0, 0);

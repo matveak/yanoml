@@ -4,7 +4,7 @@
 
 /* ─── ROOT & COMMON ─────────────────────────── */
 QMainWindow, QWidget {
-    background-color: #1a1c20;
+    background-color: #16181C;
     color: #E8EAED;
     font-family: "Segoe UI", Arial, sans-serif;
     font-size: 12px;
@@ -12,19 +12,18 @@ QMainWindow, QWidget {
 
 /* ─── BUTTONS - BASE STYLE ───────────────────── */
 QPushButton {
-    background-color: #26292F;
+    background-color: #262932;
     color: #E8EAED;
-    border: 1px solid #3A3E45;
-    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 20);
+    border-radius: 10px;
     padding: 8px 14px;
     font-size: 13px;
     font-weight: 500;
-    transition: all 200ms ease-in-out;
     min-height: 32px;
 }
 
 QPushButton:hover {
-    background-color: #3A3E45;
+    background-color: #333844;
     border-color: #1BD96A;
 }
 
@@ -32,6 +31,7 @@ QPushButton:pressed {
     background-color: #1BD96A;
     color: #0A0A0A;
     font-weight: bold;
+    border-color: #1BD96A;
 }
 
 QPushButton:disabled {
@@ -44,9 +44,9 @@ QPushButton:disabled {
 QPushButton#PlayButton {
     background-color: #1BD96A;
     color: #0A0A0A;
-    font-size: 32px;
+    font-size: 30px;
     font-weight: bold;
-    border-radius: 12px;
+    border-radius: 16px;
     border: none;
     padding: 12px;
     min-height: 80px;
@@ -93,34 +93,51 @@ QPushButton#ModpackButton:pressed {
     background-color: #5B21B6;
 }
 
-QPushButton#ModPlatformButton {
-    background-color: #16A34A;
-    color: #fff;
-    border: none;
-    font-weight: bold;
+QPushButton#PlatformButton {
+    background-color: #262932;
+    color: #E8EAED;
+    border: 1px solid rgba(255, 255, 255, 22);
+    border-radius: 21px;
+    padding: 6px 16px;
+    font-weight: 600;
+    font-size: 13px;
+    text-align: left;
 }
 
-QPushButton#ModPlatformButton:hover {
-    background-color: #15803D;
+QPushButton#PlatformButton:hover {
+    border-color: #1BD96A;
+    background-color: #2C3035;
 }
 
-QPushButton#ModPlatformButton:pressed {
-    background-color: #166534;
+QPushButton#PlatformButton:pressed {
+    background-color: #2C3035;
+    color: #E8EAED;
+    font-weight: 600;
 }
 
-QPushButton#CurseForgeButton {
-    background-color: #F16436;
-    color: #fff;
-    border: none;
-    font-weight: bold;
+QPushButton#PlatformButton::menu-indicator {
+    subcontrol-origin: padding;
+    subcontrol-position: right center;
+    right: 12px;
+    width: 10px;
 }
 
-QPushButton#CurseForgeButton:hover {
-    background-color: #D95A2D;
+QMenu#PlatformMenu {
+    background-color: #262932;
+    color: #E8EAED;
+    border: 1px solid rgba(255, 255, 255, 22);
+    border-radius: 10px;
+    padding: 6px;
 }
 
-QPushButton#CurseForgeButton:pressed {
-    background-color: #B84620;
+QMenu#PlatformMenu::item {
+    padding: 8px 12px;
+    border-radius: 8px;
+}
+
+QMenu#PlatformMenu::item:selected {
+    background-color: #333844;
+    color: #E8EAED;
 }
 
 QPushButton#ElyByButton {
@@ -148,14 +165,13 @@ QPushButton#SolitaireGameButton:hover {
 
 /* ─── COMBO BOXES ──────────────────────────────── */
 QComboBox {
-    background-color: #26292F;
+    background-color: #262932;
     color: #E8EAED;
-    border: 1px solid #3A3E45;
-    border-radius: 6px;
-    padding: 4px 10px;
+    border: 1px solid rgba(255, 255, 255, 20);
+    border-radius: 10px;
+    padding: 4px 12px;
     min-height: 32px;
     font-size: 12px;
-    transition: all 150ms ease-in-out;
 }
 
 QComboBox:hover {
@@ -171,7 +187,7 @@ QComboBox:focus {
 
 QComboBox::drop-down {
     border: none;
-    width: 20px;
+    width: 24px;
     background-color: transparent;
 }
 
@@ -180,10 +196,10 @@ QComboBox::down-arrow {
 }
 
 QComboBox QAbstractItemView {
-    background-color: #26292F;
+    background-color: #262932;
     color: #E8EAED;
-    border: 1px solid #3A3E45;
-    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 20);
+    border-radius: 10px;
     selection-background-color: #1BD96A;
     selection-color: #0A0A0A;
     padding: 4px;
@@ -299,7 +315,7 @@ QTextEdit:focus {
 /* ─── FRAMES & PANELS ──────────────────────────── */
 QFrame {
     border: none;
-    background-color: #1a1c20;
+    background-color: #16181C;
 }
 
 QFrame#rightPanel {
@@ -367,15 +383,15 @@ QScrollBar::sub-line:horizontal {
 
 /* ─── DIALOGS ──────────────────────────────────── */
 QDialog {
-    background-color: #1a1c20;
+    background-color: #16181C;
 }
 
 /* ─── TOOLTIPS ─────────────────────────────────── */
 QToolTip {
-    background-color: #26292F;
+    background-color: #262932;
     color: #E8EAED;
-    border: 1px solid #3A3E45;
-    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 20);
+    border-radius: 6px;
     padding: 4px 8px;
 }
 
@@ -385,5 +401,5 @@ QToolTip {
 }
 
 #centralwidget {
-    background-color: #1a1c20;
+    background-color: #16181C;
 }
