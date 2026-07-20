@@ -55,7 +55,7 @@ Downloader::Downloader(QNetworkAccessManager *manager, QObject *parent) {
 	manager->setTransferTimeout(3000);
 }
 
-Downloader::Downloader(Downloader &other) {
+Downloader::Downloader(const Downloader &other) {
 	this->manager = other.manager;
 }
 
@@ -79,7 +79,7 @@ void Downloader::downloadFile(const QUrl& url,
 		return;
 	}
 
-	downloadQueue.enqueue({url, outputPath});
+	downloadQueue.enqueue({.url = url, .outputPath = outputPath});
 	startNextDownload();
 }
 
@@ -90,7 +90,7 @@ void Downloader::startDownload(const DownloadTask& task)
 	QNetworkReply* reply =
 		manager->get(QNetworkRequest(task.url));
 
-	QSaveFile* file = new QSaveFile(task.outputPath);
+	auto* file = new QSaveFile(task.outputPath);
 
 	if (!file->open(QIODevice::WriteOnly))
 	{
@@ -199,8 +199,8 @@ void Downloader::downloadLibrariesFromVersionJson(
 			if (!url.isEmpty() && !path.isEmpty())
 			{
 				items.push_back({
-					QUrl(url),
-					librariesDir + "/" + path
+					.url = QUrl(url),
+					.path = librariesDir + "/" + path
 				});
 			}
 		}
@@ -241,8 +241,8 @@ void Downloader::downloadLibrariesFromVersionJson(
 				if (!url.isEmpty() && !path.isEmpty())
 				{
 					items.push_back({
-						QUrl(url),
-						librariesDir + "/" + path
+						.url = QUrl(url),
+						.path = librariesDir + "/" + path
 					});
 				}
 			}

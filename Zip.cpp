@@ -34,7 +34,7 @@ QVector<ZipEntry> zipCentralDir(QFile& f)
     {
         QByteArray hdr = f.read(46);
         if (hdr.size() < 46) break;
-        const quint8* h = (const quint8*)hdr.constData();
+        const auto* h = (const quint8*)hdr.constData();
         if (h[0]!=0x50||h[1]!=0x4b||h[2]!=0x01||h[3]!=0x02) break;
 
         quint16 nl  = h[28]|(h[29]<<8);
@@ -57,7 +57,7 @@ QByteArray zipReadEntry(QFile& f, quint32 localOff)
     if (!f.seek(localOff)) return {};
     QByteArray lh = f.read(30);
     if (lh.size() < 30) return {};
-    const quint8* h = (const quint8*)lh.constData();
+    auto h = (const quint8*)lh.constData();
     if (h[0]!=0x50||h[1]!=0x4b||h[2]!=0x03||h[3]!=0x04) return {};
 
     quint16 method   = h[8] |(h[9] <<8);
@@ -77,7 +77,7 @@ QByteArray zipReadEntry(QFile& f, quint32 localOff)
         // qUncompress ждёт 4 байта big-endian несжатого размера + zlib-поток
         QByteArray zlibStream;
         zlibStream.resize(4);
-        quint8* sz4 = (quint8*)zlibStream.data();
+        auto sz4 = (quint8*)zlibStream.data();
         sz4[0] = (uncompSz>>24)&0xff; sz4[1] = (uncompSz>>16)&0xff;
         sz4[2] = (uncompSz>> 8)&0xff; sz4[3] =  uncompSz     &0xff;
         // zlib-заголовок (CMF=0x78 FLG=0x9C) + raw deflate + adler32 заглушка

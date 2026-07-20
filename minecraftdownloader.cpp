@@ -1,12 +1,12 @@
+#include "downloading/minecraftdownloader.h"
 #include "MinecraftDownloader.h"
 #include <QUrl>
-#include <QNetworkRequest>
-#include <QDebug>
 #include <QDir>
 #include <QFileInfo>
-#include <QCryptographicHash>
+#include <QNetworkReply>
 #include <QTimer>
 #include <QProcess>
+#include <QSaveFile>
 
 MinecraftDownloader::MinecraftDownloader(QObject* parent) : d{new QNetworkAccessManager(parent), parent}, md{d}, jd{d}
 {
@@ -21,7 +21,7 @@ void MinecraftDownloader::downloadVanillaVersion(
 {
     QNetworkReply* reply = d.manager->get(QNetworkRequest(QUrl(versionJsonUrl)));
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply, outputJar]()
+    connect(reply, &QNetworkReply::finished, this, [this, reply, outputJar]
             {
                 reply->deleteLater();
 
@@ -62,14 +62,14 @@ void MinecraftDownloader::markAssetDone(int* downloaded, int total,
 void MinecraftDownloader::downloadAssetObject(const QUrl& url,
                                               const QString& outputPath,
                                               const QString& expectedHash,
-                                              int* downloaded,
+                                              const int* downloaded,
                                               int total,
                                               const QString& instancePath,
                                               int attempt)
 {
     QNetworkReply*      reply = d.manager->get(QNetworkRequest(url));
-    QSaveFile*          file  = new QSaveFile(outputPath);
-    QCryptographicHash* sha1  = new QCryptographicHash(QCryptographicHash::Sha1);
+    auto file  = new QSaveFile(outputPath);
+    auto sha1  = new QCryptographicHash(QCryptographicHash::Sha1);
 
     if (!file->open(QIODevice::WriteOnly))
     {
@@ -81,7 +81,7 @@ void MinecraftDownloader::downloadAssetObject(const QUrl& url,
         return;
     }
 
-    connect(reply, &QNetworkReply::readyRead, this, [reply, file, sha1]()
+    connect(reply, &QNetworkReply::readyRead, this, [reply, file, sha1]
             {
                 QByteArray chunk = reply->readAll();
                 file->write(chunk);
@@ -90,7 +90,7 @@ void MinecraftDownloader::downloadAssetObject(const QUrl& url,
 
     connect(reply, &QNetworkReply::finished, this,
             [this, reply, file, sha1, url, outputPath, expectedHash,
-             downloaded, total, instancePath, attempt]()
+             downloaded, total, instancePath, attempt]
             {
                 QByteArray tail = reply->readAll();
                 if (!tail.isEmpty())
@@ -160,7 +160,7 @@ QString MinecraftDownloader::findInstalledLoaderId(const QString& gameDir,
     const QString versionsRoot = gameDir + "/versions";
     QDir d(versionsRoot);
     if (!d.exists())
-        return QString();
+        return {};
 
     const QString loaderLower = loader.toLower();
     QString best;
@@ -207,7 +207,7 @@ void MinecraftDownloader::installFabric(const QString& mcVersion, const QString&
     QNetworkReply* listReply =
         d.manager->get(QNetworkRequest(QUrl(loaderListUrl)));
 
-    connect(listReply, &QNetworkReply::finished, this, [=]()
+    connect(listReply, &QNetworkReply::finished, this, [=]
             {
                 listReply->deleteLater();
 
@@ -242,7 +242,7 @@ void MinecraftDownloader::installFabric(const QString& mcVersion, const QString&
                 QNetworkReply* profReply =
                     d.manager->get(QNetworkRequest(QUrl(profileUrl)));
 
-                connect(profReply, &QNetworkReply::finished, this, [=]()
+                connect(profReply, &QNetworkReply::finished, this, [=]
                         {
                             profReply->deleteLater();
 
@@ -311,7 +311,7 @@ void MinecraftDownloader::installFabric(const QString& mcVersion, const QString&
                             const int total = items.size();
                             int* done = new int(0);
 
-                            auto finishOne = [this, total, done, versionId]()
+                            auto finishOne = [this, total, done, versionId]
                             {
                                 ++(*done);
                                 emit totalProgress((*done * 100) / total);
@@ -345,9 +345,9 @@ void MinecraftDownloader::installFabric(const QString& mcVersion, const QString&
                                 }
 
                                 connect(r, &QNetworkReply::readyRead, this,
-                                        [r, f]() { f->write(r->readAll()); });
+                                        [r, f] { f->write(r->readAll()); });
 
-                                connect(r, &QNetworkReply::finished, this, [=]()
+                                connect(r, &QNetworkReply::finished, this, [=]
                                         {
                                             const QByteArray tail = r->readAll();
                                             if (!tail.isEmpty())
@@ -427,7 +427,7 @@ void MinecraftDownloader::installForgeLike(const QString& mcVersion,
             "https://files.minecraftforge.net/net/minecraftforge/forge/"
             "promotions_slim.json")));
 
-        connect(promoReply, &QNetworkReply::finished, this, [=]()
+        connect(promoReply, &QNetworkReply::finished, this, [=]
                 {
                     promoReply->deleteLater();
 
@@ -466,7 +466,7 @@ void MinecraftDownloader::installForgeLike(const QString& mcVersion,
             "https://maven.neoforged.net/releases/net/neoforged/neoforge/"
             "maven-metadata.xml")));
 
-        connect(metaReply, &QNetworkReply::finished, this, [=]()
+        connect(metaReply, &QNetworkReply::finished, this, [=]
                 {
                     metaReply->deleteLater();
 
@@ -509,7 +509,7 @@ void MinecraftDownloader::runLoaderInstaller(const QUrl& installerUrl,
     const QString installerPath =
         installersDir + "/" + loader + "-" + mcVersion + "-installer.jar";
 
-    auto runProc = [=]()
+    auto runProc = [=]
     {
         // Установщик Forge/NeoForge требует launcher_profiles.json в каталоге.
         const QString lp = gameDir + "/launcher_profiles.json";
@@ -584,7 +584,7 @@ void MinecraftDownloader::runLoaderInstaller(const QUrl& installerUrl,
     }
 
     QNetworkReply* r = d.manager->get(QNetworkRequest(installerUrl));
-    QSaveFile* f = new QSaveFile(installerPath);
+    auto* f = new QSaveFile(installerPath);
 
     if (!f->open(QIODevice::WriteOnly))
     {
@@ -597,9 +597,9 @@ void MinecraftDownloader::runLoaderInstaller(const QUrl& installerUrl,
     connect(r, &QNetworkReply::downloadProgress,
             this, &MinecraftDownloader::downloadProgress);
     connect(r, &QNetworkReply::readyRead, this,
-            [r, f]() { f->write(r->readAll()); });
+            [r, f] { f->write(r->readAll()); });
 
-    connect(r, &QNetworkReply::finished, this, [=]()
+    connect(r, &QNetworkReply::finished, this, [=]
             {
                 const QByteArray tail = r->readAll();
                 if (!tail.isEmpty())

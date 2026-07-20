@@ -8,7 +8,7 @@
 
 Settings globalSettings = Settings::load();
 
-void Settings::save() {
+void Settings::save() const {
     QSettings s("yanoml", "yanoml");
     s.setValue("minecraft-path", minecraftPath);
     s.setValue("java-path", javaPath);

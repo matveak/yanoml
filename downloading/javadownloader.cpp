@@ -11,7 +11,7 @@
 
 // ==================== JAVA RUNTIME ====================
 
-JavaDownloader::JavaDownloader(Downloader &downloader) : Downloader(downloader) {}
+JavaDownloader::JavaDownloader(const Downloader &downloader) : Downloader(downloader) {}
 
 
 void JavaDownloader::downloadJavaRuntime(const QString& component,
@@ -46,7 +46,7 @@ void JavaDownloader::downloadJavaRuntime(const QString& component,
     QNetworkReply* allReply = manager->get(QNetworkRequest(QUrl(allUrl)));
 
     connect(allReply, &QNetworkReply::finished, this,
-            [this, allReply, platformKey, component, outputDir]()
+            [this, allReply, platformKey, component, outputDir]
             {
                 allReply->deleteLater();
 
@@ -83,7 +83,7 @@ void JavaDownloader::downloadJavaRuntime(const QString& component,
                     manager->get(QNetworkRequest(QUrl(manifestUrl)));
 
                 connect(manReply, &QNetworkReply::finished, this,
-                        [this, manReply, outputDir]()
+                        [this, manReply, outputDir]
                         {
                             manReply->deleteLater();
 
@@ -129,7 +129,7 @@ void JavaDownloader::downloadJavaRuntime(const QString& component,
                                 if (rawUrl.isEmpty())
                                     continue;
 
-                                items.push_back({ rawUrl, outPath, exe });
+                                items.push_back({ .url = rawUrl, .path = outPath, .executable = exe });
                             }
 
                             if (items.isEmpty())
@@ -141,9 +141,9 @@ void JavaDownloader::downloadJavaRuntime(const QString& component,
                                 javaExe = outputDir + "/bin/javaw.exe";
 
                             const int total = items.size();
-                            int* done = new int(0);
+                            auto done = new int(0);
 
-                            auto finishOne = [this, total, done, javaExe]()
+                            auto finishOne = [this, total, done, javaExe]
                             {
                                 ++(*done);
                                 emit javaRuntimeProgress((*done * 100) / total);
@@ -154,17 +154,17 @@ void JavaDownloader::downloadJavaRuntime(const QString& component,
                                 }
                             };
 
-                            for (const DlItem& item : items)
+                            for (const auto&[url, path, executable] : items)
                             {
-                                if (QFileInfo::exists(item.path))
+                                if (QFileInfo::exists(path))
                                 {
                                     finishOne();
                                     continue;
                                 }
 
                                 QNetworkReply* fileReply =
-                                    manager->get(QNetworkRequest(QUrl(item.url)));
-                                QFile* f = new QFile(item.path);
+                                    manager->get(QNetworkRequest(QUrl(url)));
+                                auto* f = new QFile(path);
 
                                 if (!f->open(QIODevice::WriteOnly))
                                 {
@@ -175,20 +175,20 @@ void JavaDownloader::downloadJavaRuntime(const QString& component,
                                 }
 
                                 connect(fileReply, &QNetworkReply::readyRead, this,
-                                        [fileReply, f]()
+                                        [fileReply, f]
                                         {
                                             f->write(fileReply->readAll());
                                         });
 
                                 connect(fileReply, &QNetworkReply::finished, this,
-                                        [=]()
+                                        [=]
                                         {
                                             QByteArray tail = fileReply->readAll();
                                             if (!tail.isEmpty())
                                                 f->write(tail);
                                             f->close();
 
-                                            if (item.executable)
+                                            if (executable)
                                                 f->setPermissions(f->permissions()
                                                     | QFileDevice::ExeOwner
                                                     | QFileDevice::ExeGroup

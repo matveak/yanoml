@@ -71,7 +71,7 @@ TitleBar::TitleBar(QWidget *window, QWidget *parent)
 
     QList<QPushButton*> buttons = { minimizeButton, m_maximizeButton, closeButton };
 
-    const QString baseStyle = QString(
+    const auto baseStyle = QString(
         "QPushButton { "
         "    border: none; "
         "    border-radius: 6px; "

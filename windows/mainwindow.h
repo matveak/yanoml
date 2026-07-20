@@ -46,20 +46,20 @@ private slots:
     void on_InstallerButton_clicked();
 
 private:
-    QWidget      *centralwidget;
-    QPushButton  *PlayButton;
-    QPushButton  *PlatformButton;
-    QPushButton  *UpdateButton;
-    QPushButton  *ElyByButton;
-    QComboBox    *UpdateBox;
-    QPushButton  *SettingsButton;
-    QPushButton  *PickAccountButton;
-    QPushButton  *InstallerButton;
-    QPushButton  *ModpackButton;
-    QComboBox    *VersionBox;
-    QMenuBar     *menubar;
-    QMenu        *menulauncher;
-    QStatusBar   *statusbar;
+    QWidget      *centralwidget{};
+    QPushButton  *PlayButton{};
+    QPushButton  *PlatformButton{};
+    QPushButton  *UpdateButton{};
+    QPushButton  *ElyByButton{};
+    QComboBox    *UpdateBox{};
+    QPushButton  *SettingsButton{};
+    QPushButton  *PickAccountButton{};
+    QPushButton  *InstallerButton{};
+    QPushButton  *ModpackButton{};
+    QComboBox    *VersionBox{};
+    QMenuBar     *menubar{};
+    QMenu        *menulauncher{};
+    QStatusBar   *statusbar{};
     QVBoxLayout  *rightPanelLayout;
 
     WindowFrame* frame = nullptr;

@@ -4,7 +4,6 @@
 
 #ifndef MINECRAFTLAUNCHER_H
 #define MINECRAFTLAUNCHER_H
-#include <QObject>
 #include <QProcess>
 
 #include "minecraftdownloader.h"
@@ -17,10 +16,10 @@ public:
 
 	void MinecraftFinished(int exitCode, QProcess::ExitStatus);
 
-	QString getCrashHint(int neededJava, QString javaPath) const;
+	QString getCrashHint(int neededJava, const QString& javaPath) const;
 
 	void ensureJava(const QString &mcVersion, const QString &gameDir,
-	                std::function<void(QString)> cb, QString javaPath);
+	                std::function<void(QString)> cb, const QString& javaPath);
 
 	void launchGame(const QJsonObject &root, const QString &gameDir, const QString &version, const QString &versionDir,
 	                const QString &mainClass, const QString &javaPath, QString username, int ram,

@@ -10,9 +10,7 @@
 class JavaDownloader : public Downloader {
 	Q_OBJECT
 	public:
-
-
-	JavaDownloader(Downloader &downloader);
+	explicit JavaDownloader(const Downloader &downloader);
 
 	void downloadJavaRuntime(const QString &component, const QString &outputDir);
 

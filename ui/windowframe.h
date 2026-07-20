@@ -21,7 +21,6 @@ public:
 private:
 	void setupUi();
 
-private:
 	QVBoxLayout *m_layout = nullptr;
 
 	TitleBar *m_titleBar = nullptr;

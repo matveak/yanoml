@@ -30,7 +30,6 @@ protected:
 private:
 	void updateMaximizeIcon();
 
-private:
 	QWidget* m_window;
 
 	QLabel* m_title;

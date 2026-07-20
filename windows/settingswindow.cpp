@@ -119,7 +119,7 @@ SettingsWindow::SettingsWindow(QWidget* parent)
     layout->addStretch();
     layout->addWidget(closeButton);
 
-    connect(closeButton, &QPushButton::clicked, this, [this]() {
+    connect(closeButton, &QPushButton::clicked, this, [this] {
         globalSettings.showSnapshots = snapshotsCheckBox->isChecked();
         globalSettings.javaPath = javaPathEdit->text();
         globalSettings.minecraftPath = minecraftPathEdit->text();

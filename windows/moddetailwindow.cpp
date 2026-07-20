@@ -29,7 +29,7 @@ ModDetailsWindow::ModDetailsWindow(
     api = new ModrithAPI(this);
     manager = new QNetworkAccessManager(this);
 
-    QVBoxLayout* mainLayout =
+    auto mainLayout =
         new QVBoxLayout(this);
     mainLayout->setContentsMargins(20, 20, 20, 20);
     mainLayout->setSpacing(14);
@@ -38,7 +38,7 @@ ModDetailsWindow::ModDetailsWindow(
     // HEADER
     // =========================
 
-    QHBoxLayout* headerLayout =
+    auto* headerLayout =
         new QHBoxLayout();
 
     iconLabel =
@@ -50,7 +50,7 @@ ModDetailsWindow::ModDetailsWindow(
                                  "border-radius: 12px; border: 1px solid %1; background: %2;")
                                  .arg(Theme::border().name(), Theme::panel().name()));
 
-    QVBoxLayout* infoLayout =
+    auto* infoLayout =
         new QVBoxLayout();
 
     infoLayout->setSpacing(6);
@@ -113,12 +113,12 @@ ModDetailsWindow::ModDetailsWindow(
     // GALLERY
     // =========================
 
-    QScrollArea* galleryArea =
+    auto galleryArea =
         new QScrollArea(this);
 
     galleryArea->setWidgetResizable(true);
 
-    QWidget* galleryWidget =
+    auto* galleryWidget =
         new QWidget();
 
     galleryLayout =
@@ -142,7 +142,7 @@ ModDetailsWindow::ModDetailsWindow(
                                      "QPushButton:hover { background-color: #15c25e; }")
                                      .arg(Theme::accent().name()));
 
-    connect(installButton, &QPushButton::clicked, this, [this]() {
+    connect(installButton, &QPushButton::clicked, this, [this] {
         emit installRequested(currentMod);
     });
 
@@ -221,7 +221,7 @@ void ModDetailsWindow::onProjectReceived(
             reply,
             &QNetworkReply::finished,
             this,
-            [this, reply]()
+            [this, reply]
             {
                 QByteArray data =
                     reply->readAll();
@@ -249,7 +249,7 @@ void ModDetailsWindow::onProjectReceived(
     for(const QString& imageUrl :
          project.gallery)
     {
-        QLabel* imageLabel =
+        auto imageLabel =
             new QLabel();
 
         imageLabel->setAlignment(
@@ -273,7 +273,7 @@ void ModDetailsWindow::onProjectReceived(
             reply,
             &QNetworkReply::finished,
             this,
-            [imageLabel, reply]()
+            [imageLabel, reply]
             {
                 QByteArray data =
                     reply->readAll();

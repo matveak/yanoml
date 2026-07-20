@@ -152,19 +152,19 @@ void extractNativesForVersion(const QJsonObject& root,
         }
 
         const QVector<ZipEntry> zipEntries = zipCentralDir(jarFile);
-        for (const ZipEntry& ze : zipEntries)
+        for (const auto&[name, localOffset] : zipEntries)
         {
-            if (ze.name.endsWith('/'))
+            if (name.endsWith('/'))
                 continue; // каталог
 
             bool excluded = false;
             for (const QString& ex : excludes)
-                if (ze.name.startsWith(ex)) { excluded = true; break; }
+                if (name.startsWith(ex)) { excluded = true; break; }
             if (excluded)
                 continue;
 
             // Сохраняем в плоскую папку natives (только имя файла, без пути).
-            QString outName = QFileInfo(ze.name).fileName();
+            QString outName = QFileInfo(name).fileName();
             if (outName.isEmpty())
                 continue;
 
@@ -172,11 +172,11 @@ void extractNativesForVersion(const QJsonObject& root,
             if (QFileInfo::exists(outPath))
                 continue; // уже извлечено
 
-            QByteArray data = zipReadEntry(jarFile, ze.localOffset);
-            qDebug() << "Extract:" << ze.name << "from" << jarPath;
+            QByteArray data = zipReadEntry(jarFile, localOffset);
+            qDebug() << "Extract:" << name << "from" << jarPath;
             if (data.isEmpty())
             {
-                qWarning() << "Failed to decompress native:" << ze.name;
+                qWarning() << "Failed to decompress native:" << name;
                 continue;
             }
 

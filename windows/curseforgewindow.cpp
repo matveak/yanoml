@@ -24,18 +24,20 @@
 #include <QSize>
 #include <QColor>
 
+#include "../settings.h"
+
 // ==================== Constants ====================
 
 namespace {
-    const int ICON_SIZE = 64;
-    const int CARD_MIN_HEIGHT = 90;
-    const int SEARCH_FIELD_HEIGHT = 38;
-    const int BUTTON_HEIGHT = 36;
-    const int INSTALL_BUTTON_WIDTH = 130;
-    const int WEB_BUTTON_WIDTH = 60;
-    const int WEB_BUTTON_HEIGHT = 28;
-    const int MAX_DESCRIPTION_LENGTH = 120;
-    const int MAX_VERSIONS_DISPLAY = 4;
+    constexpr int ICON_SIZE = 64;
+    constexpr int CARD_MIN_HEIGHT = 90;
+    constexpr int SEARCH_FIELD_HEIGHT = 38;
+    constexpr int BUTTON_HEIGHT = 36;
+    constexpr int INSTALL_BUTTON_WIDTH = 130;
+    constexpr int WEB_BUTTON_WIDTH = 60;
+    constexpr int WEB_BUTTON_HEIGHT = 28;
+    constexpr int MAX_DESCRIPTION_LENGTH = 120;
+    constexpr int MAX_VERSIONS_DISPLAY = 4;
 
     const QString USER_AGENT = "ZXCrackLauncher/1.0 (Qt)";
     const QString FALLBACK_URL_TEMPLATE = "https://edge.forgecdn.net/files/%1/%2/%3";
@@ -112,8 +114,8 @@ CurseForgeWindow::CurseForgeWindow(QWidget* parent)
         curseforgeBtn->setToolTip("CurseForge — текущий раздел");
         curseforgeBtn->setStyleSheet(switchBtnStyle);
 
-        connect(modrinthBtn, &QPushButton::clicked, this, [this]() {
-            ModWindow* window = new ModWindow(parentWidget());
+        connect(modrinthBtn, &QPushButton::clicked, this, [this] {
+            auto* window = new ModWindow(parentWidget());
             window->setSettingsWindow(m_settings);
             window->setAttribute(Qt::WA_DeleteOnClose);
             window->exec();
@@ -427,7 +429,7 @@ QLabel* CurseForgeWindow::createIconLabel(const QString& iconUrl)
 void CurseForgeWindow::downloadIconAsync(const QString& url, QLabel* target)
 {
     auto* reply = m_nam->get(QNetworkRequest(QUrl(url)));
-    connect(reply, &QNetworkReply::finished, this, [reply, target]() {
+    connect(reply, &QNetworkReply::finished, this, [reply, target] {
         QPixmap pixmap;
         pixmap.loadFromData(reply->readAll());
         if (!pixmap.isNull()) {
@@ -477,7 +479,7 @@ QVBoxLayout* CurseForgeWindow::createInfoLayout(const CFMod& mod)
 QLabel* CurseForgeWindow::createVersionsLabel(const QStringList& versions)
 {
     QStringList sorted = versions;
-    std::sort(sorted.begin(), sorted.end(), std::greater<QString>());
+    std::ranges::sort(sorted, std::greater<QString>());
 
     QString versionText = sorted.mid(0, MAX_VERSIONS_DISPLAY).join(", ");
     if (sorted.size() > MAX_VERSIONS_DISPLAY) {
@@ -533,7 +535,7 @@ QPushButton* CurseForgeWindow::createInstallButton(const CFMod& mod, bool isModp
             .arg(Theme::accent().name()));
     }
 
-    connect(button, &QPushButton::clicked, this, [this, mod, isModpack]() {
+    connect(button, &QPushButton::clicked, this, [this, mod, isModpack] {
         installItem(mod, isModpack);
     });
 
@@ -550,7 +552,7 @@ QPushButton* CurseForgeWindow::createWebsiteButton(const QString& url)
         "QPushButton:hover { background:%1; color:#0A0A0A; }")
         .arg(Theme::accentCurseForge().name()));
 
-    connect(button, &QPushButton::clicked, this, [url]() {
+    connect(button, &QPushButton::clicked, this, [url] {
         QDesktopServices::openUrl(QUrl(url));
     });
 
@@ -608,7 +610,7 @@ void CurseForgeWindow::downloadFile(const QUrl& url,
                                     const QString& fileName,
                                     bool isModpack)
 {
-    QString gameDir = m_settings ? m_settings->minecraftPath() : "";
+    QString gameDir = globalSettings.minecraftPath;
     if (gameDir.isEmpty()) {
         gameDir = QDir::homePath() + "/AppData/Roaming/.minecraft";
     }
@@ -638,7 +640,7 @@ void CurseForgeWindow::downloadFile(const QUrl& url,
         return;
     }
 
-    connect(reply, &QNetworkReply::readyRead, this, [reply, saveFile]() {
+    connect(reply, &QNetworkReply::readyRead, this, [reply, saveFile] {
         saveFile->write(reply->readAll());
     });
 
@@ -651,7 +653,7 @@ void CurseForgeWindow::downloadFile(const QUrl& url,
         });
 
     connect(reply, &QNetworkReply::finished, this,
-        [this, reply, saveFile, finalFileName, savePath]() {
+        [this, reply, saveFile, finalFileName, savePath] {
             handleDownloadFinished(reply, saveFile, finalFileName, savePath);
         });
 }

@@ -3,11 +3,9 @@
 #include "curseforgewindow.h"
 #include "modwindow.h"
 
-#include <QProcess>
 #include <QSystemTrayIcon>
 #include <QMenu>
 #include <QVBoxLayout>
-#include <QHBoxLayout>
 #include <QTextEdit>
 #include <QLabel>
 #include <QPushButton>
@@ -34,14 +32,16 @@
 #include <QPixmap>
 #include <QAction>
 #include <QColor>
+#include "../settings.h"
 
 
 // ==================== Helpers ====================
 
+class MinecraftDownloader;
 // Небольшая цветная иконка-«бейдж» с буквой (как значок платформы в селекторе)
 static QIcon makePlatformIcon(const QColor &color, const QString &letter)
 {
-    const int size = 20;
+    constexpr int size = 20;
     QPixmap pixmap(size, size);
     pixmap.fill(Qt::transparent);
 
@@ -58,7 +58,7 @@ static QIcon makePlatformIcon(const QColor &color, const QString &letter)
     painter.setPen(Qt::white);
     painter.drawText(QRect(0, 0, size, size), Qt::AlignCenter, letter);
 
-    return QIcon(pixmap);
+    return {pixmap};
 }
 
 // ==================== MainWindow ====================
@@ -105,29 +105,29 @@ void MainWindow::setupUI() {
     centralwidget = new QWidget(this);
     centralwidget->setObjectName("centralwidget");
 
-    QHBoxLayout *rootLayout = new QHBoxLayout(centralwidget);
+    auto *rootLayout = new QHBoxLayout(centralwidget);
     rootLayout->setContentsMargins(0, 0, 0, 0);
     rootLayout->setSpacing(0);
 
     // ─── ЛЕВАЯ ОБЛАСТЬ (фон / логотип) ────────────────────────
-    QWidget *bgWidget = new QWidget();
+    auto *bgWidget = new QWidget();
     bgWidget->setObjectName("bgWidget");
     bgWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
-    QVBoxLayout *bgLayout = new QVBoxLayout(bgWidget);
+    auto *bgLayout = new QVBoxLayout(bgWidget);
     bgLayout->setContentsMargins(0, 0, 0, 0);
     bgLayout->setSpacing(12);
 
-    QLabel *bgLogo = new QLabel("🎮");
+    auto *bgLogo = new QLabel("🎮");
     bgLogo->setStyleSheet("font-size: 96px;");
     bgLogo->setAlignment(Qt::AlignCenter);
     
-    QLabel *bgSub = new QLabel("YANOML Launcher");
+    auto *bgSub = new QLabel("YANOML Launcher");
     bgSub->setObjectName("titleLabel");
     bgSub->setStyleSheet("font-size: 28px; font-weight: bold; color: #1BD96A;");
     bgSub->setAlignment(Qt::AlignCenter);
     
-    QLabel *bgDesc = new QLabel("Play Your Minecraft Adventure");
+    auto *bgDesc = new QLabel("Play Your Minecraft Adventure");
     bgDesc->setObjectName("subtitleLabel");
     bgDesc->setStyleSheet("font-size: 13px; color: #9CA3AF; font-weight: 400;");
     bgDesc->setAlignment(Qt::AlignCenter);
@@ -141,7 +141,7 @@ void MainWindow::setupUI() {
     rootLayout->addWidget(bgWidget, 1);
 
     // ─── ПРАВАЯ ПАНЕЛЬ (управление) ────────────────────────────
-    QFrame *rightPanel = new QFrame();
+    auto *rightPanel = new QFrame();
     rightPanel->setObjectName("rightPanel");
     
     // Адаптивная ширина: 25-35% от ширины окна
@@ -153,14 +153,14 @@ void MainWindow::setupUI() {
     rightPanelLayout->setSpacing(10);
 
     // ─── Заголовок ─────────────────────────────────────────────
-    QLabel *title = new QLabel("Launcher");
+    auto *title = new QLabel("Launcher");
     title->setObjectName("titleLabel");
     title->setAlignment(Qt::AlignCenter);
     rightPanelLayout->addWidget(title);
 
     // ─── Разделитель ───────────────────────────────────────────
-    auto makeSep = [&]() {
-        QFrame* sep = new QFrame();
+    auto makeSep = [&] {
+        auto* sep = new QFrame();
         sep->setObjectName("separator");
         sep->setFrameShape(QFrame::HLine);
         sep->setFixedHeight(1);
@@ -176,7 +176,7 @@ void MainWindow::setupUI() {
     PlatformButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     PlatformButton->setLayoutDirection(Qt::LeftToRight);
 
-    QMenu *platformMenu = new QMenu(PlatformButton);
+    auto *platformMenu = new QMenu(PlatformButton);
     platformMenu->setObjectName("PlatformMenu");
 
     QAction *modrinthAction = platformMenu->addAction(
@@ -189,11 +189,11 @@ void MainWindow::setupUI() {
         PlatformButton->setText("  " + name);
     };
 
-    connect(modrinthAction, &QAction::triggered, this, [this, selectPlatform]() {
+    connect(modrinthAction, &QAction::triggered, this, [this, selectPlatform] {
         selectPlatform(QColor("#1BD96A"), "M", "Modrinth");
         on_ModPlatformButton_clicked();
     });
-    connect(curseforgeAction, &QAction::triggered, this, [this, selectPlatform]() {
+    connect(curseforgeAction, &QAction::triggered, this, [this, selectPlatform] {
         selectPlatform(QColor("#F16436"), "C", "CurseForge");
         on_CurseForgeButton_clicked();
     });
@@ -205,7 +205,7 @@ void MainWindow::setupUI() {
     rightPanelLayout->addWidget(PlatformButton);
 
     // ─── Ряд: Модпаки и игры ─────────────────────────────────
-    QHBoxLayout *gamesRow = new QHBoxLayout();
+    auto *gamesRow = new QHBoxLayout();
     gamesRow->setSpacing(8);
     gamesRow->setContentsMargins(0, 0, 0, 0);
 
@@ -220,7 +220,7 @@ void MainWindow::setupUI() {
     rightPanelLayout->addWidget(makeSep());
 
     // ─── Загрузчик ─────────────────────────────────────────────
-    QLabel *loaderLbl = new QLabel("Loader");
+    auto *loaderLbl = new QLabel("Loader");
     loaderLbl->setObjectName("sectionLabel");
     rightPanelLayout->addWidget(loaderLbl);
 
@@ -231,7 +231,7 @@ void MainWindow::setupUI() {
     rightPanelLayout->addWidget(LoaderBox);
     connect(LoaderBox, &QComboBox::currentTextChanged, this, &MainWindow::onLoaderChanged);
 
-    QLabel *versionLbl = new QLabel("Minecraft Version");
+    auto versionLbl = new QLabel("Minecraft Version");
     versionLbl->setObjectName("sectionLabel");
     rightPanelLayout->addWidget(versionLbl);
 
@@ -243,7 +243,7 @@ void MainWindow::setupUI() {
     rightPanelLayout->addWidget(makeSep());
 
     // ─── Установить + Ely.by ───────────────────────────────────
-    QHBoxLayout *installRow = new QHBoxLayout();
+    auto installRow = new QHBoxLayout();
     installRow->setSpacing(8);
     installRow->setContentsMargins(0, 0, 0, 0);
 
@@ -264,7 +264,7 @@ void MainWindow::setupUI() {
     rightPanelLayout->addWidget(makeSep());
 
     // ─── Аккаунт + Настройки ───────────────────────────────────
-    QHBoxLayout *accountRow = new QHBoxLayout();
+    auto accountRow = new QHBoxLayout();
     accountRow->setSpacing(8);
     accountRow->setContentsMargins(0, 0, 0, 0);
 
@@ -310,8 +310,7 @@ void MainWindow::setupUI() {
     QMetaObject::connectSlotsByName(this);
 }
 
-MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
-{
+MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), rightPanelLayout(nullptr) {
     setupUI();
 
     // progressBar добавляем в правую панель (над кнопкой Play)
@@ -329,6 +328,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     setupConnections();
     loadVersions();
 }
+
 // ==================== MainWindow ====================
 
 // ==================== Tray ====================
@@ -341,7 +341,7 @@ void MainWindow::setupTrayIcon()
     if (trayIcon->icon().isNull())
         trayIcon->setIcon(style()->standardIcon(QStyle::SP_ComputerIcon));
 
-    QMenu* trayMenu = new QMenu(this);
+    auto* trayMenu = new QMenu(this);
     trayMenu->addAction("Open Launcher", this, &MainWindow::show);
     trayMenu->addAction("Exit", this, &QWidget::close);
 
@@ -374,7 +374,7 @@ void MainWindow::on_InstallerButton_clicked()
     cleanVersion.remove("Forge ");
     cleanVersion.remove("NeoForge ");
 
-    QString gameDir = settingsWindow->minecraftPath();
+    QString gameDir = globalSettings.minecraftPath;
     if (gameDir.isEmpty())
         gameDir = QDir::homePath() + "/AppData/Roaming/.minecraft";
 
@@ -434,7 +434,7 @@ void MainWindow::startLoaderInstall(const QString& loader,
                              {
                                  progressBar->hide();
                                  downloader->installForgeLike(mcVersion, loader, javaExe, gameDir);
-                             }, settingsWindow->javaPath());
+                             }, globalSettings.javaPath);
     }
 }
 
@@ -442,7 +442,7 @@ void MainWindow::startLoaderInstall(const QString& loader,
 
 void MainWindow::on_PlayButton_clicked()
 {
-    QString gameDir = settingsWindow->minecraftPath();
+    QString gameDir = globalSettings.minecraftPath;
     if (gameDir.isEmpty())
         gameDir = QDir::homePath() + "/AppData/Roaming/.minecraft";
 
@@ -503,8 +503,8 @@ void MainWindow::on_PlayButton_clicked()
                                  int requiredMajor =
                                          parentRoot["javaVersion"].toObject()["majorVersion"].toInt();
                                  launcher->launchModded(parentRoot, childRoot, gameDir, parentVersion,
-                                                        versionId, javaExe, settingsWindow->username(), settingsWindow->ramAmount(), requiredMajor);
-                             }, settingsWindow->javaPath());
+                                                        versionId, javaExe, globalSettings.username(), settingsWindow->ramAmount, requiredMajor);
+                             }, globalSettings.javaPath);
         return;
     }
 
@@ -541,8 +541,8 @@ void MainWindow::on_PlayButton_clicked()
                              progressBar->hide();
                              int requiredMajor = root["javaVersion"].toObject()["majorVersion"].toInt();
                             launcher->launchGame(root, gameDir, version, versionDir, mainClass,
-                                                  javaExe, settingsWindow->username(), settingsWindow->ramAmount(), requiredMajor);
-                         }, settingsWindow->javaPath());
+                                                  javaExe, globalSettings.username(), settingsWindow->ramAmount, requiredMajor);
+                         }, globalSettings.javaPath);
 }
 
 // ==================== Crash Dialog ====================
@@ -553,14 +553,14 @@ void MainWindow::showCrashDialog(int neededJava, const QString& javaPath)
     activateWindow();
     raise();
 
-    QDialog* dlg = new QDialog(this);
+    auto* dlg = new QDialog(this);
     dlg->setWindowTitle("Minecraft — Error");
     dlg->resize(900, 600);
     dlg->setAttribute(Qt::WA_DeleteOnClose);
 
-    QVBoxLayout* lay = new QVBoxLayout(dlg);
+    auto lay = new QVBoxLayout(dlg);
 
-    QLabel* hint = new QLabel(dlg);
+    auto hint = new QLabel(dlg);
     hint->setWordWrap(true);
     hint->setStyleSheet("font-weight: bold; color: #c0392b;");
 
@@ -568,7 +568,7 @@ void MainWindow::showCrashDialog(int neededJava, const QString& javaPath)
     hint->setText(hintText);
     lay->addWidget(hint);
 
-    QTextEdit* logEdit = new QTextEdit(dlg);
+    auto logEdit = new QTextEdit(dlg);
     logEdit->setReadOnly(true);
     logEdit->setFont(QFont("Courier New", 9));
     logEdit->setStyleSheet("background:#1e1e1e; color:#d4d4d4;");
@@ -576,15 +576,15 @@ void MainWindow::showCrashDialog(int neededJava, const QString& javaPath)
     logEdit->moveCursor(QTextCursor::End);
     lay->addWidget(logEdit, 1);
 
-    QHBoxLayout* btnRow = new QHBoxLayout();
+    auto btnRow = new QHBoxLayout();
 
-    QPushButton* copyBtn = new QPushButton("📋 Copy Log", dlg);
-    connect(copyBtn, &QPushButton::clicked, dlg, [this]()
+    auto copyBtn = new QPushButton("📋 Copy Log", dlg);
+    connect(copyBtn, &QPushButton::clicked, dlg, [this]
             {
                 QApplication::clipboard()->setText(launcher->crashLog);
             });
 
-    QPushButton* closeBtn = new QPushButton("Close", dlg);
+    auto closeBtn = new QPushButton("Close", dlg);
     connect(closeBtn, &QPushButton::clicked, dlg, &QDialog::accept);
 
     btnRow->addWidget(copyBtn);
@@ -599,7 +599,7 @@ void MainWindow::showCrashDialog(int neededJava, const QString& javaPath)
 
 void MainWindow::on_ModPlatformButton_clicked()
 {
-    ModWindow* window = new ModWindow(this);
+    auto* window = new ModWindow(this);
     window->setSettingsWindow(settingsWindow);
     window->setAttribute(Qt::WA_DeleteOnClose);
     window->exec();
@@ -614,7 +614,7 @@ void MainWindow::on_ElyByButton_clicked() {}
 
 void MainWindow::on_SettingsButton_clicked()
 {
-    settingsWindow->exec();
+    globalSettings.exec;
 }
 
 void MainWindow::on_PickAccountButton_clicked()
@@ -652,7 +652,7 @@ void MainWindow::onVanillaVersionsReceived(const QVector<MinecraftVersion>& vers
                          > QVersionNumber::fromString(b.gameVersion);
               });
 
-    bool showSnapshots = settingsWindow && settingsWindow->showSnapshots();
+    bool showSnapshots = settingsWindow && globalSettings.showSnapshots;
 
     for (const auto& ver : sorted)
     {
@@ -667,7 +667,7 @@ void MainWindow::onFabricVersionsReceived(const QJsonArray& versions)
     for (const auto& value : versions)
     {
         QJsonObject obj = value.toObject();
-        if (!settingsWindow->showSnapshots() && !obj["stable"].toBool()) continue;
+        if (!globalSettings.showSnapshots() && !obj["stable"].toBool) continue;
         VersionBox->addItem("Fabric " + obj["version"].toString());
     }
 }
@@ -682,10 +682,10 @@ void MainWindow::onForgeVersionsReceived(const QJsonObject& json)
         mcVersions.insert(it.key().section('-', 0, 0));
 
     QStringList versions = mcVersions.values();
-    std::sort(versions.begin(), versions.end(),
-              [](const QString& a, const QString& b) {
-                  return QVersionNumber::fromString(a) > QVersionNumber::fromString(b);
-              });
+    std::ranges::sort(versions,
+                      [](const QString& a, const QString& b) {
+                          return QVersionNumber::fromString(a) > QVersionNumber::fromString(b);
+                      });
 
     for (const QString& v : versions)
         VersionBox->addItem("Forge " + v);
@@ -728,7 +728,7 @@ void MainWindow::onNeoForgeVersionReceived(const QString& xml)
         if ((version.contains("beta",  Qt::CaseInsensitive) ||
              version.contains("alpha", Qt::CaseInsensitive) ||
              version.contains("rc",    Qt::CaseInsensitive))
-            && !settingsWindow->showSnapshots())
+            && !globalSettings.showSnapshots)
             continue;
 
         const QString mcVersion = neoForgeToMcVersion(version);
@@ -740,10 +740,10 @@ void MainWindow::onNeoForgeVersionReceived(const QString& xml)
         }
     }
 
-    std::sort(mcVersions.begin(), mcVersions.end(),
-              [](const QString& a, const QString& b) {
-                  return QVersionNumber::fromString(a) > QVersionNumber::fromString(b);
-              });
+    std::ranges::sort(mcVersions,
+                      [](const QString& a, const QString& b) {
+                          return QVersionNumber::fromString(a) > QVersionNumber::fromString(b);
+                      });
 
     for (const QString& v : mcVersions)
         VersionBox->addItem(v);
@@ -758,7 +758,8 @@ void MainWindow::loadVersions()
 
 void MainWindow::on_CurseForgeButton_clicked()
 {
-    CurseForgeWindow* w = new CurseForgeWindow(this);
+
+    auto w = new CurseForgeWindow(this);
     w->setAttribute(Qt::WA_DeleteOnClose);
     w->setSettingsWindow(settingsWindow);
     w->exec();
@@ -766,10 +767,10 @@ void MainWindow::on_CurseForgeButton_clicked()
 
 void MainWindow::on_ModpackButton_clicked()
 {
-    CreateModpackWindow* w = new CreateModpackWindow(this);
+    auto w = new CreateModpackWindow(this);
     w->setAttribute(Qt::WA_DeleteOnClose);
     w->setSettingsWindow(settingsWindow);
-    MinecraftDownloader* dlForModpack = new MinecraftDownloader(w);
+    auto dlForModpack = new MinecraftDownloader(w);
     w->setDownloader(dlForModpack);
     connect(dlForModpack, &MinecraftDownloader::instanceCreated, this,
             [this](const QString& path) {

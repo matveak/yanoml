@@ -9,7 +9,6 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QJsonArray>
-#include <QJsonObject>
 #include <QMessageBox>
 #include <QProcess>
 #include <QVersionNumber>
@@ -92,7 +91,7 @@ void MinecraftLauncher::MinecraftFinished(int exitCode, QProcess::ExitStatus st)
 		emit onMineCraftCrash(0, "");
 }
 
-QString MinecraftLauncher::getCrashHint(int neededJava, QString javaPath) const {
+QString MinecraftLauncher::getCrashHint(int neededJava, const QString& javaPath) const {
 	QString hintText;
 	if (crashLog.contains("UnsupportedClassVersionError"))
 		hintText = "⚠ Неподходящая версия Java!\n"
@@ -124,7 +123,7 @@ QString MinecraftLauncher::getCrashHint(int neededJava, QString javaPath) const 
 
 void MinecraftLauncher::ensureJava(const QString& mcVersion,
                             const QString& gameDir,
-                            std::function<void(QString)> cb, QString jp)
+                            std::function<void(QString)> cb, const QString& jp)
 {
 	int requiredMajor = requiredJavaMajor(mcVersion);
 

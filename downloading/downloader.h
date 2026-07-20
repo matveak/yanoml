@@ -31,7 +31,7 @@ public:
 
 	explicit Downloader(QNetworkAccessManager *manager, QObject *parent = nullptr);
 
-	Downloader(Downloader &other);
+	Downloader(const Downloader &other);
 
 	void startNextDownload();
 

@@ -4,7 +4,6 @@
 
 #ifndef YANOML_SETTINGS_H
 #define YANOML_SETTINGS_H
-#include <QColor>
 #include <QString>
 
 struct Settings {
@@ -14,7 +13,7 @@ struct Settings {
     QString javaPath = "";
     QString minecraftPath = "";
 
-    void save();
+    void save() const;
     static Settings load();
 
     //TODO: UI Settings
