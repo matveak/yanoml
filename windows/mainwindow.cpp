@@ -1,8 +1,5 @@
 #include "mainwindow.h"
-#include "createmodpackwindow.h"
-#include "curseforgewindow.h"
 #include "modwindow.h"
-
 #include <QSystemTrayIcon>
 #include <QMenu>
 #include <QVBoxLayout>
@@ -224,12 +221,12 @@ void MainWindow::setupUI() {
     loaderLbl->setObjectName("sectionLabel");
     m_rightPanelLayout->addWidget(loaderLbl);
 
-    LoaderBox = new QComboBox();
-    LoaderBox->setObjectName("LoaderBox");
-    LoaderBox->addItems({"Vanilla", "Fabric", "Forge", "NeoForge"});
-    LoaderBox->setMinimumHeight(32);
-    m_rightPanelLayout->addWidget(LoaderBox);
-    connect(LoaderBox, &QComboBox::currentTextChanged, this, &MainWindow::onLoaderChanged);
+    m_LoaderBox = new QComboBox();
+    m_LoaderBox->setObjectName("LoaderBox");
+    m_LoaderBox->addItems({"Vanilla", "Fabric", "Forge", "NeoForge"});
+    m_LoaderBox->setMinimumHeight(32);
+    m_rightPanelLayout->addWidget(m_LoaderBox);
+    connect(m_LoaderBox, &QComboBox::currentTextChanged, this, &MainWindow::onLoaderChanged);
 
     auto versionLbl = new QLabel("Minecraft Version");
     versionLbl->setObjectName("sectionLabel");
@@ -319,10 +316,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), m_rightPanelLayou
     m_progressBar->setValue(0);
     m_progressBar->setFixedHeight(10);
     m_progressBar->hide();
-    m_rightPanelLayout->insertWidget(m_rightPanelLayout->count() - 1, progressBar);
+    m_rightPanelLayout->insertWidget(m_rightPanelLayout->count() - 1, m_progressBar);
 
-    downloader = new MinecraftDownloader(this);
-    settingsWindow = new SettingsWindow(this);
+    m_downloader = new MinecraftDownloader(this);
+    m_settingsWindow = new SettingsWindow(this);
 
     setupTrayIcon();
     setupConnections();
@@ -335,20 +332,20 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), m_rightPanelLayou
 
 void MainWindow::setupTrayIcon()
 {
-    trayIcon = new QSystemTrayIcon(this);
-    trayIcon->setIcon(QIcon(":/icons/minecraft.png"));
+    m_trayIcon = new QSystemTrayIcon(this);
+    m_trayIcon->setIcon(QIcon(":/icons/minecraft.png"));
 
-    if (trayIcon->icon().isNull())
-        trayIcon->setIcon(style()->standardIcon(QStyle::SP_ComputerIcon));
+    if (m_trayIcon->icon().isNull())
+        m_trayIcon->setIcon(style()->standardIcon(QStyle::SP_ComputerIcon));
 
     auto* trayMenu = new QMenu(this);
     trayMenu->addAction("Open Launcher", this, &MainWindow::show);
     trayMenu->addAction("Exit", this, &QWidget::close);
 
-    trayIcon->setContextMenu(trayMenu);
-    trayIcon->show();
+    m_trayIcon->setContextMenu(trayMenu);
+    m_trayIcon->show();
 
-    connect(trayIcon, &QSystemTrayIcon::activated, this,
+    connect(m_trayIcon, &QSystemTrayIcon::activated, this,
             [this](QSystemTrayIcon::ActivationReason reason)
             {
                 if (reason == QSystemTrayIcon::DoubleClick)
@@ -367,7 +364,7 @@ void MainWindow::setupConnections()
 void MainWindow::on_InstallerButton_clicked()
 {
     QString versionText = m_versionBox->currentText();
-    QString loader = LoaderBox->currentText().toLower();
+    QString loader = m_LoaderBox->currentText().toLower();
 
     QString cleanVersion = versionText;
     cleanVersion.remove("Fabric ");
@@ -380,8 +377,8 @@ void MainWindow::on_InstallerButton_clicked()
 
     const bool modded = (loader != "vanilla" && !loader.isEmpty());
 
-    progressBar->setValue(0);
-    progressBar->show();
+    m_progressBar->setValue(0);
+    m_progressBar->show();
 
     if (!modded)
     {
@@ -393,7 +390,7 @@ void MainWindow::on_InstallerButton_clicked()
     m_modLoaderPending = true;
 
     auto conn = std::make_shared<QMetaObject::Connection>();
-    *conn = connect(downloader, &MinecraftDownloader::instanceCreated, this,
+    *conn = connect(m_downloader, &MinecraftDownloader::instanceCreated, this,
                     [this, conn, loader, cleanVersion, gameDir](const QString&)
                     {
                         disconnect(*conn);
@@ -409,31 +406,31 @@ void MainWindow::startLoaderInstall(const QString& loader,
                                     const QString& mcVersion,
                                     const QString& gameDir)
 {
-    progressBar->setValue(0);
-    progressBar->show();
+    m_progressBar->setValue(0);
+    m_progressBar->show();
 
     auto conn = std::make_shared<QMetaObject::Connection>();
-    *conn = connect(downloader, &MinecraftDownloader::loaderInstalled, this,
+    *conn = connect(m_downloader, &MinecraftDownloader::loaderInstalled, this,
                     [this, conn](const QString& versionId)
                     {
                         disconnect(*conn);
                         m_modLoaderPending = false;
-                        progressBar->hide();
+                        m_progressBar->hide();
                         QMessageBox::information(this, "Done",
                                                  "Loader installed:\n" + versionId);
                     });
 
     if (loader == "fabric")
     {
-        downloader->installFabric(mcVersion, gameDir);
+        m_downloader->installFabric(mcVersion, gameDir);
     }
     else
     {
-        launcher->ensureJava(mcVersion, gameDir,
+        m_launcher->ensureJava(mcVersion, gameDir,
                              [this, loader, mcVersion, gameDir](const QString& javaExe)
                              {
-                                 progressBar->hide();
-                                 downloader->installForgeLike(mcVersion, loader, javaExe, gameDir);
+                                 m_progressBar->hide();
+                                 m_downloader->installForgeLike(mcVersion, loader, javaExe, gameDir);
                              }, globalSettings.javaPath);
     }
 }
@@ -446,7 +443,7 @@ void MainWindow::on_PlayButton_clicked()
     if (gameDir.isEmpty())
         gameDir = QDir::homePath() + "/AppData/Roaming/.minecraft";
 
-    QString loader = LoaderBox ? LoaderBox->currentText().toLower() : "vanilla";
+    QString loader = m_LoaderBox ? m_LoaderBox->currentText().toLower() : "vanilla";
 
     QString versionText = m_versionBox->currentText();
     QString version = versionText;
@@ -496,14 +493,14 @@ void MainWindow::on_PlayButton_clicked()
             QJsonDocument::fromJson(parentFile.readAll()).object();
         parentFile.close();
 
-        launcher->ensureJava(parentVersion, gameDir,
+        m_launcher->ensureJava(parentVersion, gameDir,
                              [this, parentRoot, childRoot, gameDir, parentVersion, versionId](const QString& javaExe)
                              {
-                                 progressBar->hide();
+                                 m_progressBar->hide();
                                  int requiredMajor =
                                          parentRoot["javaVersion"].toObject()["majorVersion"].toInt();
-                                 launcher->launchModded(parentRoot, childRoot, gameDir, parentVersion,
-                                                        versionId, javaExe, globalSettings.username(), settingsWindow->ramAmount, requiredMajor);
+                                 m_launcher->launchModded(parentRoot, childRoot, gameDir, parentVersion,
+                                                        versionId, javaExe, globalSettings.m_username(), m_settingsWindow->m_ramAmount, requiredMajor);
                              }, globalSettings.javaPath);
         return;
     }
@@ -534,14 +531,14 @@ void MainWindow::on_PlayButton_clicked()
         return;
     }
 
-    launcher->ensureJava(version, gameDir,
+    m_launcher->ensureJava(version, gameDir,
                          [this, root, gameDir, version, versionDir, mainClass]
                  (const QString& javaExe)
                          {
-                             progressBar->hide();
+                             m_progressBar->hide();
                              int requiredMajor = root["javaVersion"].toObject()["majorVersion"].toInt();
-                            launcher->launchGame(root, gameDir, version, versionDir, mainClass,
-                                                  javaExe, globalSettings.username(), settingsWindow->ramAmount, requiredMajor);
+                            m_launcher->launchGame(root, gameDir, version, versionDir, mainClass,
+                                                  javaExe, globalSettings.username(), m_settingsWindow->ramAmount, requiredMajor);
                          }, globalSettings.javaPath);
 }
 
@@ -564,7 +561,7 @@ void MainWindow::showCrashDialog(int neededJava, const QString& javaPath)
     hint->setWordWrap(true);
     hint->setStyleSheet("font-weight: bold; color: #c0392b;");
 
-    QString hintText = launcher->getCrashHint(neededJava, javaPath);
+    QString hintText = m_launcher->getCrashHint(neededJava, javaPath);
     hint->setText(hintText);
     lay->addWidget(hint);
 
@@ -572,7 +569,7 @@ void MainWindow::showCrashDialog(int neededJava, const QString& javaPath)
     logEdit->setReadOnly(true);
     logEdit->setFont(QFont("Courier New", 9));
     logEdit->setStyleSheet("background:#1e1e1e; color:#d4d4d4;");
-    logEdit->setPlainText(launcher->m_crashLog);
+    logEdit->setPlainText(m_launcher->m_crashLog);
     logEdit->moveCursor(QTextCursor::End);
     lay->addWidget(logEdit, 1);
 
@@ -581,7 +578,7 @@ void MainWindow::showCrashDialog(int neededJava, const QString& javaPath)
     auto copyBtn = new QPushButton("📋 Copy Log", dlg);
     connect(copyBtn, &QPushButton::clicked, dlg, [this]
             {
-                QApplication::clipboard()->setText(launcher->m_crashLog);
+                QApplication::clipboard()->setText(m_launcher->m_crashLog);
             });
 
     auto closeBtn = new QPushButton("Close", dlg);
@@ -599,10 +596,6 @@ void MainWindow::showCrashDialog(int neededJava, const QString& javaPath)
 
 void MainWindow::on_ModPlatformButton_clicked()
 {
-    auto* window = new ModWindow(this);
-    window->setSettingsWindow(settingsWindow);
-    window->setAttribute(Qt::WA_DeleteOnClose);
-    window->exec();
 }
 
 void MainWindow::on_UpdateButton_clicked()
@@ -628,17 +621,17 @@ void MainWindow::onLoaderChanged(const QString& loader)
 {
     m_versionBox->clear();
 
-    if (loader == "Vanilla")        downloader->md.fetchVanillaVersions();
-    else if (loader == "Fabric")    downloader->md.fetchFabricVersions();
-    else if (loader == "Forge")     downloader->md.fetchForgeVersions();
-    else if (loader == "NeoForge")  downloader->md.fetchNeoForgeVersions();
+    if (loader == "Vanilla")        m_downloader->md.fetchVanillaVersions();
+    else if (loader == "Fabric")    m_downloader->md.fetchFabricVersions();
+    else if (loader == "Forge")     m_downloader->md.fetchForgeVersions();
+    else if (loader == "NeoForge")  m_downloader->md.fetchNeoForgeVersions();
 }
 
 void MainWindow::onShowSnapshotsChanged(int)
 {
     m_versionBox->clear();
     m_versionBox->addItem("Updating list...");
-    downloader->md.fetchVanillaVersions();
+    m_downloader->md.fetchVanillaVersions();
 }
 
 void MainWindow::onVanillaVersionsReceived(const QVector<MinecraftVersion>& versions)
@@ -648,16 +641,16 @@ void MainWindow::onVanillaVersionsReceived(const QVector<MinecraftVersion>& vers
     QVector<MinecraftVersion> sorted = versions;
     std::sort(sorted.begin(), sorted.end(),
               [](const MinecraftVersion& a, const MinecraftVersion& b) {
-                  return QVersionNumber::fromString(a.gameVersion)
-                         > QVersionNumber::fromString(b.gameVersion);
+                  return QVersionNumber::fromString(a.m_gameVersion)
+                         > QVersionNumber::fromString(b.m_gameVersion);
               });
 
-    bool showSnapshots = settingsWindow && globalSettings.showSnapshots;
+    bool showSnapshots = m_settingsWindow && globalSettings.showSnapshots;
 
     for (const auto& ver : sorted)
     {
-        if (!showSnapshots && ver.loaderType != "release") continue;
-        m_versionBox->addItem(ver.gameVersion);
+        if (!showSnapshots && ver.m_loaderType != "release") continue;
+        m_versionBox->addItem(ver.m_gameVersion);
     }
 }
 
@@ -667,7 +660,7 @@ void MainWindow::onFabricVersionsReceived(const QJsonArray& versions)
     for (const auto& value : versions)
     {
         QJsonObject obj = value.toObject();
-        if (!globalSettings.showSnapshots() && !obj["stable"].toBool) continue;
+        if (globalSettings.showSnapshots() || obj["stable"].toBool) continue;
         m_versionBox->addItem("Fabric " + obj["version"].toString());
     }
 }
@@ -753,29 +746,5 @@ void MainWindow::loadVersions()
 {
     m_versionBox->clear();
     m_versionBox->addItem("Loading versions...");
-    downloader->md.fetchVanillaVersions();
-}
-
-void MainWindow::on_CurseForgeButton_clicked()
-{
-
-    auto w = new CurseForgeWindow(this);
-    w->setAttribute(Qt::WA_DeleteOnClose);
-    w->setSettingsWindow(settingsWindow);
-    w->exec();
-}
-
-void MainWindow::on_ModpackButton_clicked()
-{
-    auto w = new CreateModpackWindow(this);
-    w->setAttribute(Qt::WA_DeleteOnClose);
-    w->setSettingsWindow(settingsWindow);
-    auto dlForModpack = new MinecraftDownloader(w);
-    w->setDownloader(dlForModpack);
-    connect(dlForModpack, &MinecraftDownloader::instanceCreated, this,
-            [this](const QString& path) {
-                QMessageBox::information(this, "Modpack Created",
-                                         "Modpack created successfully:\n" + path);
-            });
-    w->exec();
+    m_downloader->md.fetchVanillaVersions();
 }
