@@ -8,6 +8,7 @@
 #include <QFileDialog>
 #include <QSettings>
 
+#include "../settings.h"
 #include "../ui/theme.h"
 
 SettingsWindow::SettingsWindow(QWidget* parent)
@@ -48,7 +49,7 @@ SettingsWindow::SettingsWindow(QWidget* parent)
 
     // Снапшоты
     snapshotsCheckBox = new QCheckBox("Показывать снапшоты", this);
-    snapshotsCheckBox->setChecked(settings.value("snapshots", false).toBool());
+    snapshotsCheckBox->setChecked(globalSettings.showSnapshotes);
 
     // Память
     ramLabel = new QLabel(this);
@@ -59,19 +60,18 @@ SettingsWindow::SettingsWindow(QWidget* parent)
     });
     ramSlider->setMinimum(1);
     ramSlider->setMaximum(32);
-    ramSlider->setValue(settings.value("minecraftRam", 2).toInt());
+    ramSlider->setValue(globalSettings.ramGb);
 
     // Никнейм
-    QLabel* usernameLabel = new QLabel("Никнейм в игре:", this);
-    usernameEdit = new QLineEdit(this);
-    usernameEdit->setText(settings.value("username", "Player").toString());
+    auto* usernameLabel = new QLabel("Никнейм в игре:", this);
+    nicknameEdit = new QLineEdit(this);
+    nicknameEdit->setText(globalSettings.nickname);
 
     // Путь к Minecraft
-    QLabel* minecraftPathLabel = new QLabel("Путь к Minecraft:", this);
+    auto* minecraftPathLabel = new QLabel("Путь к Minecraft:", this);
     minecraftPathEdit = new QLineEdit(this);
     minecraftBrowseButton = new QPushButton("Обзор...", this);
-    minecraftPathEdit->setText(settings.value("minecraftPath",
-                                              "C:/Users/" + qgetenv("USERNAME") + "/AppData/Roaming/.minecraft").toString());
+    minecraftPathEdit->setText(globalSettings.minecraftPath);
 
     connect(minecraftBrowseButton, &QPushButton::clicked, this, [this] {
         QString dir = QFileDialog::getExistingDirectory(this, "Выберите папку Minecraft");
@@ -82,10 +82,10 @@ SettingsWindow::SettingsWindow(QWidget* parent)
     });
 
     // Путь к Java
-    QLabel* javaPathLabel = new QLabel("Путь к Java:", this);
+    auto* javaPathLabel = new QLabel("Путь к Java:", this);
     javaPathEdit = new QLineEdit(this);
     javaBrowseButton = new QPushButton("Обзор...", this);
-    javaPathEdit->setText(settings.value("javaPath", "C:/Program Files/Java/jdk-21/").toString());
+    javaPathEdit->setText(globalSettings.javaPath);
 
     connect(javaBrowseButton, &QPushButton::clicked, this, [this]{
         QString dir = QFileDialog::getExistingDirectory(this, "Выберите папку Java");
@@ -95,20 +95,9 @@ SettingsWindow::SettingsWindow(QWidget* parent)
         }
     });
 
-    // checkStateChanged(Qt::CheckState) появился в Qt 6.7;
-    // для совместимости с Qt 5 используем stateChanged(int).
-#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
-    connect(snapshotsCheckBox, &QCheckBox::checkStateChanged, this, [this](Qt::CheckState) {
-        emit settingsChanged();
-    });
-#else
-    connect(snapshotsCheckBox, &QCheckBox::stateChanged, this, [this](int) {
-        emit settingsChanged();
-    });
-#endif
 
     // Кнопка сохранения
-    QPushButton* closeButton = new QPushButton("Сохранить и закрыть", this);
+    auto* closeButton = new QPushButton("Сохранить и закрыть", this);
     closeButton->setObjectName("saveBtn");
 
     // Добавляем всё в layout
@@ -117,7 +106,7 @@ SettingsWindow::SettingsWindow(QWidget* parent)
     layout->addWidget(ramSlider);
 
     layout->addWidget(usernameLabel);
-    layout->addWidget(usernameEdit);
+    layout->addWidget(nicknameEdit);
 
     layout->addWidget(minecraftPathLabel);
     layout->addWidget(minecraftPathEdit);
@@ -131,11 +120,12 @@ SettingsWindow::SettingsWindow(QWidget* parent)
     layout->addWidget(closeButton);
 
     connect(closeButton, &QPushButton::clicked, this, [this]() {
-        settings.setValue("minecraftPath", minecraftPathEdit->text());
-        settings.setValue("javaPath", javaPathEdit->text());
-        settings.setValue("username", usernameEdit->text().trimmed());
-        settings.setValue("snapshots", snapshotsCheckBox->isChecked());
-        settings.setValue("minecraftRam", ramSlider->value());
+        globalSettings.showSnapshotes = snapshotsCheckBox->isChecked();
+        globalSettings.javaPath = javaPathEdit->text();
+        globalSettings.minecraftPath = minecraftPathEdit->text();
+        globalSettings.nickname = nicknameEdit->text();
+        globalSettings.ramGb = ramSlider->value();
+        emit settingsChanged();
         accept();
     });
 }

@@ -30,7 +30,6 @@ private:
     QLineEdit* javaPathEdit = nullptr;
     QPushButton* javaBrowseButton = nullptr;
 
-    QLineEdit* usernameEdit = nullptr;   // ← Новое поле
 
-    QSettings settings{"MyLauncher", "Crack"};
+    QLineEdit* nicknameEdit = nullptr;   // ← Новое поле
 };
