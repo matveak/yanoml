@@ -84,11 +84,11 @@ void MainWindow::setupUI() {
     setWindowFlags(Qt::FramelessWindowHint);
 
     // Создаем WindowFrame и используем его как основной контейнер
-    frame = new WindowFrame(this);
-    frame->setTitle("YANOML Launcher");
+    m_frame = new WindowFrame(this);
+    m_frame->setTitle("YANOML Launcher");
 
     // Получаем контент-виджет из фрейма
-    QWidget* contentWidget = frame->contentWidget();
+    QWidget* contentWidget = m_frame->contentWidget();
     auto* root = new QVBoxLayout(contentWidget);
     root->setContentsMargins(0, 0, 0, 0);
     root->setSpacing(0);
@@ -102,10 +102,10 @@ void MainWindow::setupUI() {
     }
 
     // ─── Виджеты ──────────────────────────────────────────────
-    centralwidget = new QWidget(this);
-    centralwidget->setObjectName("centralwidget");
+    m_centralwidget = new QWidget(this);
+    m_centralwidget->setObjectName("centralwidget");
 
-    auto *rootLayout = new QHBoxLayout(centralwidget);
+    auto *rootLayout = new QHBoxLayout(m_centralwidget);
     rootLayout->setContentsMargins(0, 0, 0, 0);
     rootLayout->setSpacing(0);
 
@@ -148,15 +148,15 @@ void MainWindow::setupUI() {
     int rightPanelWidth = qBound(300, static_cast<int>(windowWidth * 0.28), 450);
     rightPanel->setFixedWidth(rightPanelWidth);
 
-    rightPanelLayout = new QVBoxLayout(rightPanel);
-    rightPanelLayout->setContentsMargins(16, 16, 16, 16);
-    rightPanelLayout->setSpacing(10);
+    m_rightPanelLayout = new QVBoxLayout(rightPanel);
+    m_rightPanelLayout->setContentsMargins(16, 16, 16, 16);
+    m_rightPanelLayout->setSpacing(10);
 
     // ─── Заголовок ─────────────────────────────────────────────
     auto *title = new QLabel("Launcher");
     title->setObjectName("titleLabel");
     title->setAlignment(Qt::AlignCenter);
-    rightPanelLayout->addWidget(title);
+    m_rightPanelLayout->addWidget(title);
 
     // ─── Разделитель ───────────────────────────────────────────
     auto makeSep = [&] {
@@ -166,17 +166,17 @@ void MainWindow::setupUI() {
         sep->setFixedHeight(1);
         return sep;
     };
-    rightPanelLayout->addWidget(makeSep());
+    m_rightPanelLayout->addWidget(makeSep());
 
     // ─── Источник модов (слитая кнопка-селектор) ────────────────
-    PlatformButton = new QPushButton(this);
-    PlatformButton->setObjectName("PlatformButton");
-    PlatformButton->setMinimumHeight(42);
-    PlatformButton->setCursor(Qt::PointingHandCursor);
-    PlatformButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    PlatformButton->setLayoutDirection(Qt::LeftToRight);
+    m_platformButton = new QPushButton(this);
+    m_platformButton->setObjectName("PlatformButton");
+    m_platformButton->setMinimumHeight(42);
+    m_platformButton->setCursor(Qt::PointingHandCursor);
+    m_platformButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    m_platformButton->setLayoutDirection(Qt::LeftToRight);
 
-    auto *platformMenu = new QMenu(PlatformButton);
+    auto *platformMenu = new QMenu(m_platformButton);
     platformMenu->setObjectName("PlatformMenu");
 
     QAction *modrinthAction = platformMenu->addAction(
@@ -185,8 +185,8 @@ void MainWindow::setupUI() {
         makePlatformIcon(QColor("#F16436"), "C"), "CurseForge");
 
     auto selectPlatform = [this](const QColor &color, const QString &letter, const QString &name) {
-        PlatformButton->setIcon(makePlatformIcon(color, letter));
-        PlatformButton->setText("  " + name);
+        m_platformButton->setIcon(makePlatformIcon(color, letter));
+        m_platformButton->setText("  " + name);
     };
 
     connect(modrinthAction, &QAction::triggered, this, [this, selectPlatform] {
@@ -198,128 +198,128 @@ void MainWindow::setupUI() {
         on_CurseForgeButton_clicked();
     });
 
-    PlatformButton->setMenu(platformMenu);
-    PlatformButton->setIconSize(QSize(20, 20));
+    m_platformButton->setMenu(platformMenu);
+    m_platformButton->setIconSize(QSize(20, 20));
     selectPlatform(QColor("#1BD96A"), "M", "Modrinth");
 
-    rightPanelLayout->addWidget(PlatformButton);
+    m_rightPanelLayout->addWidget(m_platformButton);
 
     // ─── Ряд: Модпаки и игры ─────────────────────────────────
     auto *gamesRow = new QHBoxLayout();
     gamesRow->setSpacing(8);
     gamesRow->setContentsMargins(0, 0, 0, 0);
 
-    ModpackButton = new QPushButton("📦 Modpack");
-    ModpackButton->setObjectName("ModpackButton");
-    ModpackButton->setMinimumHeight(40);
-    ModpackButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    gamesRow->addWidget(ModpackButton);
+    m_modpackButton = new QPushButton("📦 Modpack");
+    m_modpackButton->setObjectName("ModpackButton");
+    m_modpackButton->setMinimumHeight(40);
+    m_modpackButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    gamesRow->addWidget(m_modpackButton);
 
-    rightPanelLayout->addLayout(gamesRow);
+    m_rightPanelLayout->addLayout(gamesRow);
 
-    rightPanelLayout->addWidget(makeSep());
+    m_rightPanelLayout->addWidget(makeSep());
 
     // ─── Загрузчик ─────────────────────────────────────────────
     auto *loaderLbl = new QLabel("Loader");
     loaderLbl->setObjectName("sectionLabel");
-    rightPanelLayout->addWidget(loaderLbl);
+    m_rightPanelLayout->addWidget(loaderLbl);
 
     LoaderBox = new QComboBox();
     LoaderBox->setObjectName("LoaderBox");
     LoaderBox->addItems({"Vanilla", "Fabric", "Forge", "NeoForge"});
     LoaderBox->setMinimumHeight(32);
-    rightPanelLayout->addWidget(LoaderBox);
+    m_rightPanelLayout->addWidget(LoaderBox);
     connect(LoaderBox, &QComboBox::currentTextChanged, this, &MainWindow::onLoaderChanged);
 
     auto versionLbl = new QLabel("Minecraft Version");
     versionLbl->setObjectName("sectionLabel");
-    rightPanelLayout->addWidget(versionLbl);
+    m_rightPanelLayout->addWidget(versionLbl);
 
-    VersionBox = new QComboBox();
-    VersionBox->setObjectName("VersionBox");
-    VersionBox->setMinimumHeight(32);
-    rightPanelLayout->addWidget(VersionBox);
+    m_versionBox = new QComboBox();
+    m_versionBox->setObjectName("VersionBox");
+    m_versionBox->setMinimumHeight(32);
+    m_rightPanelLayout->addWidget(m_versionBox);
 
-    rightPanelLayout->addWidget(makeSep());
+    m_rightPanelLayout->addWidget(makeSep());
 
     // ─── Установить + Ely.by ───────────────────────────────────
     auto installRow = new QHBoxLayout();
     installRow->setSpacing(8);
     installRow->setContentsMargins(0, 0, 0, 0);
 
-    InstallerButton = new QPushButton("⬇️ Install");
-    InstallerButton->setObjectName("InstallerButton");
-    InstallerButton->setMinimumHeight(46);
-    InstallerButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    installRow->addWidget(InstallerButton);
+    m_installerButton = new QPushButton("⬇️ Install");
+    m_installerButton->setObjectName("InstallerButton");
+    m_installerButton->setMinimumHeight(46);
+    m_installerButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    installRow->addWidget(m_installerButton);
 
-    ElyByButton = new QPushButton("🇷🇺 Ely.by");
-    ElyByButton->setObjectName("ElyByButton");
-    ElyByButton->setMinimumHeight(46);
-    ElyByButton->setFixedWidth(90);
-    installRow->addWidget(ElyByButton);
+    m_elyByButton = new QPushButton("🇷🇺 Ely.by");
+    m_elyByButton->setObjectName("ElyByButton");
+    m_elyByButton->setMinimumHeight(46);
+    m_elyByButton->setFixedWidth(90);
+    installRow->addWidget(m_elyByButton);
 
-    rightPanelLayout->addLayout(installRow);
+    m_rightPanelLayout->addLayout(installRow);
 
-    rightPanelLayout->addWidget(makeSep());
+    m_rightPanelLayout->addWidget(makeSep());
 
     // ─── Аккаунт + Настройки ───────────────────────────────────
     auto accountRow = new QHBoxLayout();
     accountRow->setSpacing(8);
     accountRow->setContentsMargins(0, 0, 0, 0);
 
-    PickAccountButton = new QPushButton("👤 Account");
-    PickAccountButton->setObjectName("PickAccountButton");
-    PickAccountButton->setMinimumHeight(36);
-    PickAccountButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    accountRow->addWidget(PickAccountButton);
+    m_pickAccountButton = new QPushButton("👤 Account");
+    m_pickAccountButton->setObjectName("PickAccountButton");
+    m_pickAccountButton->setMinimumHeight(36);
+    m_pickAccountButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    accountRow->addWidget(m_pickAccountButton);
 
-    SettingsButton = new QPushButton("⚙️ Settings");
-    SettingsButton->setObjectName("SettingsButton");
-    SettingsButton->setMinimumHeight(36);
-    SettingsButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    accountRow->addWidget(SettingsButton);
+    m_settingsButton = new QPushButton("⚙️ Settings");
+    m_settingsButton->setObjectName("SettingsButton");
+    m_settingsButton->setMinimumHeight(36);
+    m_settingsButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    accountRow->addWidget(m_settingsButton);
 
-    rightPanelLayout->addLayout(accountRow);
+    m_rightPanelLayout->addLayout(accountRow);
 
-    UpdateButton = new QPushButton("🔄 Check Updates");
-    UpdateButton->setObjectName("UpdateButton");
-    UpdateButton->setMinimumHeight(32);
-    rightPanelLayout->addWidget(UpdateButton);
+    m_updateButton = new QPushButton("🔄 Check Updates");
+    m_updateButton->setObjectName("UpdateButton");
+    m_updateButton->setMinimumHeight(32);
+    m_rightPanelLayout->addWidget(m_updateButton);
 
-    rightPanelLayout->addStretch(1);
+    m_rightPanelLayout->addStretch(1);
 
     // ─── Кнопка В БОЙ (PLAY) ───────────────────────────────────
-    PlayButton = new QPushButton("▶️ PLAY");
-    PlayButton->setObjectName("PlayButton");
-    PlayButton->setMinimumHeight(86);
+    m_playButton = new QPushButton("▶️ PLAY");
+    m_playButton->setObjectName("PlayButton");
+    m_playButton->setMinimumHeight(86);
     QFont pf;
     pf.setPointSize(28);
     pf.setBold(true);
-    PlayButton->setFont(pf);
-    rightPanelLayout->addWidget(PlayButton);
+    m_playButton->setFont(pf);
+    m_rightPanelLayout->addWidget(m_playButton);
 
     rootLayout->addWidget(rightPanel);
 
     // Добавляем centralwidget в contentWidget фрейма
-    root->addWidget(centralwidget);
+    root->addWidget(m_centralwidget);
 
     // Устанавливаем frame как central widget
-    this->setCentralWidget(frame);
+    this->setCentralWidget(m_frame);
 
     QMetaObject::connectSlotsByName(this);
 }
 
-MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), rightPanelLayout(nullptr) {
+MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), m_rightPanelLayout(nullptr) {
     setupUI();
 
     // progressBar добавляем в правую панель (над кнопкой Play)
-    progressBar = new QProgressBar();
-    progressBar->setRange(0, 100);
-    progressBar->setValue(0);
-    progressBar->setFixedHeight(10);
-    progressBar->hide();
-    rightPanelLayout->insertWidget(rightPanelLayout->count() - 1, progressBar);
+    m_progressBar = new QProgressBar();
+    m_progressBar->setRange(0, 100);
+    m_progressBar->setValue(0);
+    m_progressBar->setFixedHeight(10);
+    m_progressBar->hide();
+    m_rightPanelLayout->insertWidget(m_rightPanelLayout->count() - 1, progressBar);
 
     downloader = new MinecraftDownloader(this);
     settingsWindow = new SettingsWindow(this);
@@ -366,7 +366,7 @@ void MainWindow::setupConnections()
 
 void MainWindow::on_InstallerButton_clicked()
 {
-    QString versionText = VersionBox->currentText();
+    QString versionText = m_versionBox->currentText();
     QString loader = LoaderBox->currentText().toLower();
 
     QString cleanVersion = versionText;
@@ -448,7 +448,7 @@ void MainWindow::on_PlayButton_clicked()
 
     QString loader = LoaderBox ? LoaderBox->currentText().toLower() : "vanilla";
 
-    QString versionText = VersionBox->currentText();
+    QString versionText = m_versionBox->currentText();
     QString version = versionText;
     version.remove("Fabric ");
     version.remove("Forge ");
@@ -572,7 +572,7 @@ void MainWindow::showCrashDialog(int neededJava, const QString& javaPath)
     logEdit->setReadOnly(true);
     logEdit->setFont(QFont("Courier New", 9));
     logEdit->setStyleSheet("background:#1e1e1e; color:#d4d4d4;");
-    logEdit->setPlainText(launcher->crashLog);
+    logEdit->setPlainText(launcher->m_crashLog);
     logEdit->moveCursor(QTextCursor::End);
     lay->addWidget(logEdit, 1);
 
@@ -581,7 +581,7 @@ void MainWindow::showCrashDialog(int neededJava, const QString& javaPath)
     auto copyBtn = new QPushButton("📋 Copy Log", dlg);
     connect(copyBtn, &QPushButton::clicked, dlg, [this]
             {
-                QApplication::clipboard()->setText(launcher->crashLog);
+                QApplication::clipboard()->setText(launcher->m_crashLog);
             });
 
     auto closeBtn = new QPushButton("Close", dlg);
@@ -626,7 +626,7 @@ void MainWindow::on_PickAccountButton_clicked()
 
 void MainWindow::onLoaderChanged(const QString& loader)
 {
-    VersionBox->clear();
+    m_versionBox->clear();
 
     if (loader == "Vanilla")        downloader->md.fetchVanillaVersions();
     else if (loader == "Fabric")    downloader->md.fetchFabricVersions();
@@ -636,14 +636,14 @@ void MainWindow::onLoaderChanged(const QString& loader)
 
 void MainWindow::onShowSnapshotsChanged(int)
 {
-    VersionBox->clear();
-    VersionBox->addItem("Updating list...");
+    m_versionBox->clear();
+    m_versionBox->addItem("Updating list...");
     downloader->md.fetchVanillaVersions();
 }
 
 void MainWindow::onVanillaVersionsReceived(const QVector<MinecraftVersion>& versions)
 {
-    VersionBox->clear();
+    m_versionBox->clear();
 
     QVector<MinecraftVersion> sorted = versions;
     std::sort(sorted.begin(), sorted.end(),
@@ -657,24 +657,24 @@ void MainWindow::onVanillaVersionsReceived(const QVector<MinecraftVersion>& vers
     for (const auto& ver : sorted)
     {
         if (!showSnapshots && ver.loaderType != "release") continue;
-        VersionBox->addItem(ver.gameVersion);
+        m_versionBox->addItem(ver.gameVersion);
     }
 }
 
 void MainWindow::onFabricVersionsReceived(const QJsonArray& versions)
 {
-    VersionBox->clear();
+    m_versionBox->clear();
     for (const auto& value : versions)
     {
         QJsonObject obj = value.toObject();
         if (!globalSettings.showSnapshots() && !obj["stable"].toBool) continue;
-        VersionBox->addItem("Fabric " + obj["version"].toString());
+        m_versionBox->addItem("Fabric " + obj["version"].toString());
     }
 }
 
 void MainWindow::onForgeVersionsReceived(const QJsonObject& json)
 {
-    VersionBox->clear();
+    m_versionBox->clear();
     QSet<QString> mcVersions;
     QJsonObject promos = json["promos"].toObject();
 
@@ -688,7 +688,7 @@ void MainWindow::onForgeVersionsReceived(const QJsonObject& json)
                       });
 
     for (const QString& v : versions)
-        VersionBox->addItem("Forge " + v);
+        m_versionBox->addItem("Forge " + v);
 }
 
 static QString neoForgeToMcVersion(const QString& neoVersion)
@@ -711,7 +711,7 @@ static QString neoForgeToMcVersion(const QString& neoVersion)
 
 void MainWindow::onNeoForgeVersionReceived(const QString& xml)
 {
-    VersionBox->clear();
+    m_versionBox->clear();
     QStringList lines = xml.split('\n');
     QSet<QString> added;
     QStringList mcVersions;
@@ -746,13 +746,13 @@ void MainWindow::onNeoForgeVersionReceived(const QString& xml)
                       });
 
     for (const QString& v : mcVersions)
-        VersionBox->addItem(v);
+        m_versionBox->addItem(v);
 }
 
 void MainWindow::loadVersions()
 {
-    VersionBox->clear();
-    VersionBox->addItem("Loading versions...");
+    m_versionBox->clear();
+    m_versionBox->addItem("Loading versions...");
     downloader->md.fetchVanillaVersions();
 }
 

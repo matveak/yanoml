@@ -1,5 +1,5 @@
 #include "downloading/minecraftdownloader.h"
-#include "MinecraftDownloader.h"
+#include "minecraftdownloader.h"
 #include <QUrl>
 #include <QDir>
 #include <QFileInfo>

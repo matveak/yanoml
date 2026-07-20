@@ -18,6 +18,8 @@
 #include "settingswindow.h"
 #include "../MinecraftLauncher.h"
 
+class MinecraftDownloader;
+
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -46,30 +48,30 @@ private slots:
     void on_InstallerButton_clicked();
 
 private:
-    QWidget      *centralwidget{};
-    QPushButton  *PlayButton{};
-    QPushButton  *PlatformButton{};
-    QPushButton  *UpdateButton{};
-    QPushButton  *ElyByButton{};
-    QComboBox    *UpdateBox{};
-    QPushButton  *SettingsButton{};
-    QPushButton  *PickAccountButton{};
-    QPushButton  *InstallerButton{};
-    QPushButton  *ModpackButton{};
-    QComboBox    *VersionBox{};
-    QMenuBar     *menubar{};
-    QMenu        *menulauncher{};
-    QStatusBar   *statusbar{};
-    QVBoxLayout  *rightPanelLayout;
+    QWidget      *m_centralwidget{};
+    QPushButton  *m_playButton{};
+    QPushButton  *m_platformButton{};
+    QPushButton  *m_updateButton{};
+    QPushButton  *m_elyByButton{};
+    QComboBox    *m_updateBox{};
+    QPushButton  *m_settingsButton{};
+    QPushButton  *m_pickAccountButton{};
+    QPushButton  *m_installerButton{};
+    QPushButton  *m_modpackButton{};
+    QComboBox    *m_versionBox{};
+    QMenuBar     *m_menubar{};
+    QMenu        *m_menulauncher{};
+    QStatusBar   *m_statusbar{};
+    QVBoxLayout  *m_rightPanelLayout;
 
-    WindowFrame* frame = nullptr;
-    QProgressBar*        progressBar      = nullptr;
-    QSystemTrayIcon*     trayIcon         = nullptr;
-    SettingsWindow*      settingsWindow   = nullptr;
-    MinecraftDownloader* downloader       = nullptr;
-    MinecraftLauncher*   launcher         = nullptr;
-    QComboBox*           LoaderBox        = nullptr;
-    bool               m_modLoaderPending = false;
+    WindowFrame         *m_frame            = nullptr;
+    QProgressBar        *m_progressBar      = nullptr;
+    QSystemTrayIcon     *m_trayIcon         = nullptr;
+    SettingsWindow      *m_settingsWindow   = nullptr;
+    MinecraftDownloader *m_downloader       = nullptr;
+    MinecraftLauncher   *m_launcher         = nullptr;
+    QComboBox           *m_LoaderBox        = nullptr;
+    bool                 m_modLoaderPending = false;
     void setupUI();
     void setupConnections();
     void setupTrayIcon();

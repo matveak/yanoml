@@ -4,6 +4,7 @@
 
 #ifndef MINECRAFTLAUNCHER_H
 #define MINECRAFTLAUNCHER_H
+#include <QMap>
 #include <QProcess>
 
 #include "minecraftdownloader.h"
@@ -29,14 +30,14 @@ public:
 	                  const QString &mcVersion, const QString &versionId, const QString &javaPath, QString username,
 	                  int ram, int neededJava);
 
-	QString crashLog;
+	QString m_crashLog;
 	signals:
 	void onMinecraftFinished(int exitCode, QProcess::ExitStatus exitStatus);
 	void onMineCraftCrash(int neededJava, const QString& javaPath);
 private:
-	QProcess *minecraftProcess = nullptr;
-	MinecraftDownloader *downloader = nullptr;
-	QMap<int, QString>   installedJavas;
+	QProcess *m_minecraftProcess = nullptr;
+	MinecraftDownloader *m_downloader = nullptr;
+	QMap<int, QString>   m_installedJavas;
 };
 
 #endif //MINECRAFTLAUNCHER_H

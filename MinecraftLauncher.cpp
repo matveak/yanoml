@@ -30,44 +30,44 @@ void MinecraftLauncher::startMinecraftProcess(const QString& javaPath,
 
 	// ── Launch ─────────────────────────────────────────────────────────────
 
-	crashLog.clear();
+	m_crashLog.clear();
 
 	// Сохраняем параметры запуска в лог сразу — полезно при диагностике
-	crashLog += "=== Параметры запуска ===\n";
-	crashLog += "Java:    " + javaPath + "\n";
-	crashLog += "MC:      " + version  + "\n";
-	crashLog += "GameDir: " + gameDir  + "\n";
-	crashLog += "JVM:     " + jvmArgs.join(" ") + "\n";
-	crashLog += "Args:    " + gameArgs.join(" ") + "\n\n";
-	crashLog += "=========================\n";
+	m_crashLog += "=== Параметры запуска ===\n";
+	m_crashLog += "Java:    " + javaPath + "\n";
+	m_crashLog += "MC:      " + version  + "\n";
+	m_crashLog += "GameDir: " + gameDir  + "\n";
+	m_crashLog += "JVM:     " + jvmArgs.join(" ") + "\n";
+	m_crashLog += "Args:    " + gameArgs.join(" ") + "\n\n";
+	m_crashLog += "=========================\n";
 
 
-	minecraftProcess = new QProcess(this);
-	minecraftProcess->setWorkingDirectory(gameDir);
+	m_minecraftProcess = new QProcess(this);
+	m_minecraftProcess->setWorkingDirectory(gameDir);
 
 	// Собираем весь вывод в crashLog
-	connect(minecraftProcess, &QProcess::readyReadStandardOutput, this, [this]()
+	connect(m_minecraftProcess, &QProcess::readyReadStandardOutput, this, [this]()
 			{
-				crashLog += minecraftProcess->readAllStandardOutput();
+				m_crashLog += m_minecraftProcess->readAllStandardOutput();
 			});
 
-	connect(minecraftProcess, &QProcess::readyReadStandardError, this, [this]()
+	connect(m_minecraftProcess, &QProcess::readyReadStandardError, this, [this]()
 			{
-				crashLog += minecraftProcess->readAllStandardError();
+				m_crashLog += m_minecraftProcess->readAllStandardError();
 			});
 
-	connect(minecraftProcess,
+	connect(m_minecraftProcess,
 			QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
 			this, &MinecraftLauncher::MinecraftFinished);
 
-	minecraftProcess->start(javaPath, allArgs);
+	m_minecraftProcess->start(javaPath, allArgs);
 
-	if (!minecraftProcess->waitForStarted(5000))
+	if (!m_minecraftProcess->waitForStarted(5000))
 	{
-		crashLog += "\n[ОШИБКА] Процесс не запустился (waitForStarted timeout)\n";
+		m_crashLog += "\n[ОШИБКА] Процесс не запустился (waitForStarted timeout)\n";
 		emit onMineCraftCrash(neededJava, javaPath);
-		delete minecraftProcess;
-		minecraftProcess = nullptr;
+		delete m_minecraftProcess;
+		m_minecraftProcess = nullptr;
 		return;
 	}
 
@@ -77,12 +77,12 @@ void MinecraftLauncher::startMinecraftProcess(const QString& javaPath,
 void MinecraftLauncher::MinecraftFinished(int exitCode, QProcess::ExitStatus st)
 {
 	// Дочитываем остатки вывода
-	if (minecraftProcess)
+	if (m_minecraftProcess)
 	{
-		crashLog += minecraftProcess->readAllStandardOutput();
-		crashLog += minecraftProcess->readAllStandardError();
-		minecraftProcess->deleteLater();
-		minecraftProcess = nullptr;
+		m_crashLog += m_minecraftProcess->readAllStandardOutput();
+		m_crashLog += m_minecraftProcess->readAllStandardError();
+		m_minecraftProcess->deleteLater();
+		m_minecraftProcess = nullptr;
 	}
 
 	emit onMinecraftFinished(exitCode, st);
@@ -93,26 +93,26 @@ void MinecraftLauncher::MinecraftFinished(int exitCode, QProcess::ExitStatus st)
 
 QString MinecraftLauncher::getCrashHint(int neededJava, const QString& javaPath) const {
 	QString hintText;
-	if (crashLog.contains("UnsupportedClassVersionError"))
+	if (m_crashLog.contains("UnsupportedClassVersionError"))
 		hintText = "⚠ Неподходящая версия Java!\n"
 				   "Для этой версии MC нужна Java " + QString::number(neededJava) +
 				   " или новее.\nТекущая Java: " + javaPath;
-	else if (crashLog.contains("Could not find or load main class"))
+	else if (m_crashLog.contains("Could not find or load main class"))
 		hintText = "⚠ Classpath неверный — не найден главный класс.\n"
 				   "Возможно, игра установлена не полностью. Попробуйте переустановить.";
-	else if (crashLog.contains("natives") || crashLog.contains("lwjgl"))
+	else if (m_crashLog.contains("natives") || m_crashLog.contains("lwjgl"))
 		hintText = "⚠ Ошибка нативных библиотек (LWJGL/natives).\n"
 				   "Попробуйте переустановить версию.";
-	else if (crashLog.contains("OutOfMemoryError"))
+	else if (m_crashLog.contains("OutOfMemoryError"))
 		hintText = "⚠ Недостаточно оперативной памяти.\n"
 				   "Уменьшите количество RAM в настройках.";
-	else if (crashLog.contains("Invalid maximum heap size") || crashLog.contains("Invalid initial heap size"))
+	else if (m_crashLog.contains("Invalid maximum heap size") || m_crashLog.contains("Invalid initial heap size"))
 		hintText = "⚠ Неверный размер памяти.\n"
 				   "Проверьте настройки RAM — значение слишком большое для вашей системы.";
-	else if (crashLog.contains("Error occurred during initialization of VM"))
+	else if (m_crashLog.contains("Error occurred during initialization of VM"))
 		hintText = "⚠ JVM не смогла инициализироваться.\n"
 				   "Проверьте путь к Java и объём RAM в настройках.";
-	else if (crashLog.contains("processNotStarted") || crashLog.contains("timeout"))
+	else if (m_crashLog.contains("processNotStarted") || m_crashLog.contains("timeout"))
 		hintText = "⚠ Java не найдена или не запустилась.\n"
 				   "Путь к Java: " + javaPath + "\n"
 								"Установите Java " + QString::number(neededJava) + " и укажите путь в настройках.";
@@ -131,7 +131,7 @@ void MinecraftLauncher::ensureJava(const QString& mcVersion,
 
     // 1) Подходящая Java уже установлена в системе?
     QString javaPath = pickCompatibleInstalledJava(
-        installedJavas, requiredMajor, jp);
+        m_installedJavas, requiredMajor, jp);
     if (!javaPath.isEmpty())
     {
         cb(javaPath);
@@ -149,7 +149,7 @@ void MinecraftLauncher::ensureJava(const QString& mcVersion,
 #endif
     if (QFileInfo::exists(runtimeExe))
     {
-        installedJavas[requiredMajor] = runtimeExe;
+        m_installedJavas[requiredMajor] = runtimeExe;
         cb(runtimeExe);
         return;
     }
@@ -164,15 +164,15 @@ void MinecraftLauncher::ensureJava(const QString& mcVersion,
     //                             "дождитесь завершения загрузки.");
 
     auto conn = std::make_shared<QMetaObject::Connection>();
-    *conn = connect(downloader, &MinecraftDownloader::javaRuntimeReady, this,
+    *conn = connect(m_downloader, &MinecraftDownloader::javaRuntimeReady, this,
                     [this, conn, requiredMajor, cb](const QString& javaExe)
                     {
                         disconnect(*conn);
-                        installedJavas[requiredMajor] = javaExe;
+                        m_installedJavas[requiredMajor] = javaExe;
                         cb(javaExe);
                     });
 
-    downloader->jd.downloadJavaRuntime(javaComponent, runtimeDir);
+    m_downloader->jd.downloadJavaRuntime(javaComponent, runtimeDir);
 }
 
 void MinecraftLauncher::launchGame(const QJsonObject& root,
