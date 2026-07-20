@@ -22,7 +22,7 @@ void ManifestDownloader::fetchVanillaVersions()
 	qDebug() << "Requesting versions...";
 
 	QUrl url("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json");
-	QNetworkReply* reply = manager->get(QNetworkRequest(url));
+	QNetworkReply* reply = m_manager->get(QNetworkRequest(url));
 
 	connect(reply, &QNetworkReply::finished, this, [this, reply]
 			{
@@ -42,7 +42,7 @@ void ManifestDownloader::fetchFabricVersions()
 {
     qDebug() << "Request Fabric versions";
 
-    QNetworkReply* reply = manager->get(
+    QNetworkReply* reply = m_manager->get(
         QNetworkRequest(QUrl("https://meta.fabricmc.net/v2/versions/game")));
 
     connect(reply, &QNetworkReply::finished, this, [this, reply]()
@@ -75,7 +75,7 @@ void ManifestDownloader::fetchForgeVersions()
     qDebug() << "Request Forge versions";
 
     QUrl url("https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json");
-    QNetworkReply* reply = manager->get(QNetworkRequest(url));
+    QNetworkReply* reply = m_manager->get(QNetworkRequest(url));
 
     connect(reply, &QNetworkReply::finished, this, [this, reply]()
             {
@@ -101,7 +101,7 @@ void ManifestDownloader::fetchNeoForgeVersions()
     qDebug() << "Request NeoForge versions";
 
     QUrl url("https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml");
-    QNetworkReply* reply = manager->get(QNetworkRequest(url));
+    QNetworkReply* reply = m_manager->get(QNetworkRequest(url));
 
     connect(reply, &QNetworkReply::finished, this, [this, reply]()
             {
@@ -139,11 +139,11 @@ void ManifestDownloader::handleVanillaManifest(QNetworkReply* reply)
 		QJsonObject obj = value.toObject();
 
 		MinecraftVersion ver;
-		ver.gameVersion  = obj["id"].toString();
-		ver.loaderVersion = "";
-		ver.loaderType   = obj["type"].toString();
-		ver.url          = obj["url"].toString();
-		ver.releaseTime  = obj["releaseTime"].toString();
+		ver.m_gameVersion  = obj["id"].toString();
+		ver.m_loaderVersion = "";
+		ver.m_loaderType   = obj["type"].toString();
+		ver.m_url          = obj["url"].toString();
+		ver.m_releaseTime  = obj["releaseTime"].toString();
 
 		versions.push_back(ver);
 	}

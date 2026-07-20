@@ -13,15 +13,17 @@
 #include <QSet>
 #include <QVersionNumber>
 
+#include "../settings.h"
+
 CreateModpackWindow::CreateModpackWindow(QWidget* parent)
     : QDialog(parent)
 {
     setWindowFlags(Qt::FramelessWindowHint | Qt::Dialog);
     resize(500, 320);
 
-    frame = new WindowFrame(this);
+    m_frame = new WindowFrame(this);
 
-    frame->setTitle("Создание сборки");
+    m_frame->setTitle("Создание сборки");
 
     setStyleSheet(Theme::dialogStyle());
 
@@ -31,66 +33,66 @@ CreateModpackWindow::CreateModpackWindow(QWidget* parent)
     rootLayout->setContentsMargins(0,0,0,0);
     rootLayout->setSpacing(0);
 
-    rootLayout->addWidget(frame);
+    rootLayout->addWidget(m_frame);
 
     auto* layout =
-        new QVBoxLayout(frame->contentWidget());
+        new QVBoxLayout(m_frame->contentWidget());
 
     layout->addWidget(
         new QLabel("Название сборки"));
 
-    nameEdit =
+    m_nameEdit =
         new QLineEdit(this);
 
-    layout->addWidget(nameEdit);
+    layout->addWidget(m_nameEdit);
 
     layout->addWidget(
         new QLabel("Версия Minecraft"));
 
-    versionBox =
+    m_versionBox =
         new QComboBox(this);
 
-    layout->addWidget(versionBox);
+    layout->addWidget(m_versionBox);
 
     layout->addWidget(
         new QLabel("Загрузчик"));
 
-    loaderBox =
+    m_loaderBox =
         new QComboBox(this);
 
-    loaderBox->addItems({
+    m_loaderBox->addItems({
         "Vanilla",
         "Fabric",
         "Forge",
         "NeoForge"
     });
 
-    layout->addWidget(loaderBox);
+    layout->addWidget(m_loaderBox);
 
     layout->addWidget(
         new QLabel("Версия загрузчика"));
 
-    loaderVersionBox =
+    m_loaderVersionBox =
         new QComboBox(this);
 
-    layout->addWidget(loaderVersionBox);
+    layout->addWidget(m_loaderVersionBox);
 
-    createButton =
+    m_createButton =
         new QPushButton(
             "Создать сборку");
-    createButton->setStyleSheet(Theme::accentButtonStyle());
-    createButton->setMinimumHeight(40);
+    m_createButton->setStyleSheet(Theme::accentButtonStyle());
+    m_createButton->setMinimumHeight(40);
 
-    layout->addWidget(createButton);
+    layout->addWidget(m_createButton);
 
     connect(
-        createButton,
+        m_createButton,
         &QPushButton::clicked,
         this,
         &CreateModpackWindow::onCreate);
 
     connect(
-        loaderBox,
+        m_loaderBox,
         &QComboBox::currentTextChanged,
         this,
         &CreateModpackWindow::loadLoaderVersions);
@@ -99,7 +101,7 @@ CreateModpackWindow::CreateModpackWindow(QWidget* parent)
 void CreateModpackWindow::setSettingsWindow(
     SettingsWindow* settings)
 {
-    settingsWindow = settings;
+    m_settingsWindow = settings;
 }
 
 void CreateModpackWindow::setDownloader(
@@ -108,85 +110,85 @@ void CreateModpackWindow::setDownloader(
     if(!d)
         return;
 
-    downloader = d;
+    m_downloader = d;
 
     connect(
-        downloader,
+        m_downloader,
         &MinecraftDownloader::vanillaVersionsReceived,
         this,
         &CreateModpackWindow::onVersionsLoaded);
 
     connect(
-        downloader,
+        m_downloader,
         &MinecraftDownloader::fabricVersionsReceived,
         this,
         &CreateModpackWindow::onFabricVersions);
 
     connect(
-        downloader,
+        m_downloader,
         &MinecraftDownloader::forgeVersionsReceived,
         this,
         &CreateModpackWindow::onForgeVersions);
 
     connect(
-        downloader,
+        m_downloader,
         &MinecraftDownloader::neoforgeVersionReceived,
         this,
         &CreateModpackWindow::onNeoForgeVersions);
 
-    downloader->md.fetchVanillaVersions();
+    m_downloader->md.fetchVanillaVersions();
 }
 
 void CreateModpackWindow::loadLoaderVersions()
 {
-    if(!downloader)
+    if(!m_downloader)
         return;
 
-    loaderVersionBox->clear();
+    m_loaderVersionBox->clear();
 
     QString loader =
-        loaderBox->currentText();
+        m_loaderBox->currentText();
 
     if(loader == "Fabric")
     {
-        downloader->md.fetchFabricVersions();
+        m_downloader->md.fetchFabricVersions();
     }
     else if(loader == "Forge")
     {
-        downloader->md.fetchForgeVersions();
+        m_downloader->md.fetchForgeVersions();
     }
     else if(loader == "NeoForge")
     {
-        downloader->md.fetchNeoForgeVersions();
+        m_downloader->md.fetchNeoForgeVersions();
     }
 }
 
 void CreateModpackWindow::onVersionsLoaded(
     const QVector<MinecraftVersion>& versions)
 {
-    versionBox->clear();
+    m_versionBox->clear();
 
     for(const auto& v : versions)
     {
         // Показываем только release-версии (снапшоты не нужны при создании сборки)
         if(v.loaderType == "release")
-            versionBox->addItem(v.gameVersion);
+            m_versionBox->addItem(v.gameVersion);
     }
 
-    qDebug() << "CreateModpackWindow: loaded" << versionBox->count() << "release versions";
+    qDebug() << "CreateModpackWindow: loaded" << m_versionBox->count() << "release versions";
 }
 
 void CreateModpackWindow::onFabricVersions(
     const QJsonArray& versions)
 {
-    loaderVersionBox->clear();
+    m_loaderVersionBox->clear();
 
     for(const auto& value : versions)
     {
         QJsonObject obj =
             value.toObject();
 
-        loaderVersionBox->addItem(
+        m_loaderVersionBox->addItem(
             obj["version"]
                 .toString());
     }
@@ -195,21 +197,21 @@ void CreateModpackWindow::onFabricVersions(
 void CreateModpackWindow::onForgeVersions(
     const QJsonObject& json)
 {
-    loaderVersionBox->clear();
+    m_loaderVersionBox->clear();
 
     QJsonObject promos =
         json["promos"]
             .toObject();
 
     QString mcVersion =
-        versionBox->currentText();
+        m_versionBox->currentText();
 
     QString key =
         mcVersion + "-latest";
 
     if(promos.contains(key))
     {
-        loaderVersionBox->addItem(
+        m_loaderVersionBox->addItem(
             promos[key]
                 .toString());
     }
@@ -218,7 +220,7 @@ void CreateModpackWindow::onForgeVersions(
 void CreateModpackWindow::onNeoForgeVersions(
     const QString& xml)
 {
-    loaderVersionBox->clear();
+    m_loaderVersionBox->clear();
 
     QStringList lines =
         xml.split('\n');
@@ -235,18 +237,18 @@ void CreateModpackWindow::onNeoForgeVersions(
         version.remove("</version>");
         version = version.trimmed();
 
-        loaderVersionBox->addItem(
+        m_loaderVersionBox->addItem(
             version);
     }
 }
 
 void CreateModpackWindow::onCreate()
 {
-    if(!downloader)
+    if(!m_downloader)
         return;
 
     QString name =
-        nameEdit->text().trimmed();
+        m_nameEdit->text().trimmed();
 
     if(name.isEmpty())
     {
@@ -258,18 +260,7 @@ void CreateModpackWindow::onCreate()
         return;
     }
 
-    if(!settingsWindow)
-    {
-        QMessageBox::warning(
-            this,
-            "Ошибка",
-            "Настройки не подключены");
-
-        return;
-    }
-
-    QString basePath =
-        settingsWindow->minecraftPath();
+    QString basePath = globalSettings.minecraftPath;
 
     if(basePath.isEmpty())
     {
@@ -286,19 +277,19 @@ void CreateModpackWindow::onCreate()
             .filePath(name);
 
     QString version =
-        versionBox->currentText();
+        m_versionBox->currentText();
 
     QString loader =
-        loaderBox->currentText()
+        m_loaderBox->currentText()
             .toLower();
 
     if(loader == "vanilla")
         loader.clear();
 
     QString loaderVersion =
-        loaderVersionBox->currentText();
+        m_loaderVersionBox->currentText();
 
-    //downloader->createInstance(
+    //m_downloader->createInstance(
     //    version,
     //    loader,
     //    loaderVersion,

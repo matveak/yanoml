@@ -21,9 +21,7 @@ public:
 private:
 	void setupUi();
 
-	QVBoxLayout *m_layout = nullptr;
-
-	TitleBar *m_titleBar = nullptr;
-
-	QWidget *m_contentWidget = nullptr;
+	QVBoxLayout *m_layout        = nullptr;
+	TitleBar    *m_titleBar      = nullptr;
+	QWidget     *m_contentWidget = nullptr;
 };

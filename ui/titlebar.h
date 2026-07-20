@@ -30,17 +30,12 @@ protected:
 private:
 	void updateMaximizeIcon();
 
-	QWidget* m_window;
-
-	QLabel* m_title;
-
-	QWidget* m_leftContainer;
-	QWidget* m_rightContainer;
-
-	QHBoxLayout* m_leftLayout;
-	QHBoxLayout* m_rightLayout;
-
-	QPushButton* m_maximizeButton = nullptr;
-
-	QPoint m_dragPosition;
+	QWidget     *m_window;
+	QLabel      *m_title;
+	QWidget     *m_leftContainer;
+	QWidget     *m_rightContainer;
+	QHBoxLayout *m_leftLayout;
+	QHBoxLayout *m_rightLayout;
+	QPushButton *m_maximizeButton = nullptr;
+	QPoint       m_dragPosition;
 };

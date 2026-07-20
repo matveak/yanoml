@@ -6,6 +6,7 @@
 
 #include "../minecraftdownloader.h"
 
+class MinecraftDownloader;
 class WindowFrame;
 class QLineEdit;
 class QComboBox;
@@ -40,16 +41,12 @@ private slots:
     void loadLoaderVersions();
 
 private:
-    WindowFrame* frame = nullptr;
-
-    MinecraftDownloader* downloader = nullptr;
-    SettingsWindow* settingsWindow = nullptr;
-
-    QLineEdit* nameEdit = nullptr;
-
-    QComboBox* versionBox = nullptr;
-    QComboBox* loaderBox = nullptr;
-    QComboBox* loaderVersionBox = nullptr;
-
-    QPushButton* createButton = nullptr;
+    WindowFrame         *m_frame           = nullptr;
+    MinecraftDownloader *m_downloader       = nullptr;
+    SettingsWindow      *m_settingsWindow   = nullptr;
+    QLineEdit           *m_nameEdit         = nullptr;
+    QComboBox           *m_versionBox       = nullptr;
+    QComboBox           *m_loaderBox        = nullptr;
+    QComboBox           *m_loaderVersionBox = nullptr;
+    QPushButton         *m_createButton     = nullptr;
 };

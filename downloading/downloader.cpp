@@ -51,21 +51,21 @@ static bool libraryAllowedOnCurrentOS(const QJsonObject& lib)
 
 
 Downloader::Downloader(QNetworkAccessManager *manager, QObject *parent) {
-	this->manager = manager;
+	this->m_manager = manager;
 	manager->setTransferTimeout(3000);
 }
 
 Downloader::Downloader(const Downloader &other) {
-	this->manager = other.manager;
+	this->m_manager = other.m_manager;
 }
 
 
 void Downloader::startNextDownload()
 {
-	while (activeDownloads < MaxParallelDownloads &&
-		   !downloadQueue.isEmpty())
+	while (m_activeDownloads < MaxParallelDownloads &&
+		   !m_downloadQueue.isEmpty())
 	{
-		DownloadTask task = downloadQueue.dequeue();
+		DownloadTask task = m_downloadQueue.dequeue();
 		startDownload(task);
 	}
 }
@@ -79,7 +79,7 @@ void Downloader::downloadFile(const QUrl& url,
 		return;
 	}
 
-	downloadQueue.enqueue({.url = url, .outputPath = outputPath});
+	m_downloadQueue.enqueue({.url = url, .outputPath = outputPath});
 	startNextDownload();
 }
 
@@ -88,7 +88,7 @@ void Downloader::startDownload(const DownloadTask& task)
 	QDir().mkpath(QFileInfo(task.outputPath).path());
 
 	QNetworkReply* reply =
-		manager->get(QNetworkRequest(task.url));
+		m_manager->get(QNetworkRequest(task.url));
 
 	auto* file = new QSaveFile(task.outputPath);
 
@@ -105,7 +105,7 @@ void Downloader::startDownload(const DownloadTask& task)
 		return;
 	}
 
-	++activeDownloads;
+	++m_activeDownloads;
 
 	connect(reply,
 			&QNetworkReply::readyRead,
@@ -141,7 +141,7 @@ void Downloader::startDownload(const DownloadTask& task)
 				file->deleteLater();
 				reply->deleteLater();
 
-				--activeDownloads;
+				--m_activeDownloads;
 
 				startNextDownload();
 			});

@@ -10,14 +10,12 @@
 
 struct MinecraftVersion
 {
-	QString gameVersion;
-	QString loaderVersion;
-	QString loaderType;
-
-	QString url;
-	QString releaseTime;
-
-	QString type;
+	QString m_gameVersion;
+	QString m_loaderVersion;
+	QString m_loaderType;
+	QString m_url;
+	QString m_releaseTime;
+	QString m_type;
 };
 
 class ManifestDownloader : public Downloader

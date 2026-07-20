@@ -19,15 +19,15 @@ protected:
 		QString outputPath;
 	};
 
-	QQueue<DownloadTask> downloadQueue;
-	int activeDownloads = 0;
+	QQueue<DownloadTask> m_downloadQueue;
+	int m_activeDownloads = 0;
 
 
 	static constexpr int MaxParallelDownloads = 6;
 
 public:
 	//TODO: protected
-	QNetworkAccessManager *manager;
+	QNetworkAccessManager *m_manager;
 
 	explicit Downloader(QNetworkAccessManager *manager, QObject *parent = nullptr);
 

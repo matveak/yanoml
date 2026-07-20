@@ -7,6 +7,7 @@
 class Theme
 {
 public:
+	Theme() = delete;
 	// ===== Основные цвета =====
 
 	static const QColor& background();
@@ -50,7 +51,6 @@ public:
 	static void setAccentCurseForge(const QColor& color);
 
 private:
-	Theme() = delete;
 
 	static QColor s_background;
 	static QColor s_panel;
