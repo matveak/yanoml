@@ -8,11 +8,14 @@
 #include <QString>
 
 struct Settings {
-    bool showSnapshotes = false;
+    bool showSnapshots = false;
     int ramGb = 4;
     QString nickname = "Player";
     QString javaPath = "";
     QString minecraftPath = "";
+
+    void save();
+    static Settings load();
 
     //TODO: UI Settings
 };

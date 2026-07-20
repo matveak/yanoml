@@ -49,7 +49,7 @@ SettingsWindow::SettingsWindow(QWidget* parent)
 
     // Снапшоты
     snapshotsCheckBox = new QCheckBox("Показывать снапшоты", this);
-    snapshotsCheckBox->setChecked(globalSettings.showSnapshotes);
+    snapshotsCheckBox->setChecked(globalSettings.showSnapshots);
 
     // Память
     ramLabel = new QLabel(this);
@@ -120,7 +120,7 @@ SettingsWindow::SettingsWindow(QWidget* parent)
     layout->addWidget(closeButton);
 
     connect(closeButton, &QPushButton::clicked, this, [this]() {
-        globalSettings.showSnapshotes = snapshotsCheckBox->isChecked();
+        globalSettings.showSnapshots = snapshotsCheckBox->isChecked();
         globalSettings.javaPath = javaPathEdit->text();
         globalSettings.minecraftPath = minecraftPathEdit->text();
         globalSettings.nickname = nicknameEdit->text();
