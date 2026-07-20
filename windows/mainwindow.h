@@ -48,11 +48,10 @@ private slots:
 private:
     QWidget      *centralwidget;
     QPushButton  *PlayButton;
-    QPushButton  *PlatformButton;    // слитая кнопка выбора источника модов (Modrinth / CurseForge)
+    QPushButton  *PlatformButton;
     QPushButton  *UpdateButton;
-    QPushButton  *SolitaireGameButton; //
     QPushButton  *ElyByButton;
-    QComboBox    *UpdateBox;         // используется как LoaderBox
+    QComboBox    *UpdateBox;
     QPushButton  *SettingsButton;
     QPushButton  *PickAccountButton;
     QPushButton  *InstallerButton;

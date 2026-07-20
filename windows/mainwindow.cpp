@@ -215,12 +215,6 @@ void MainWindow::setupUI() {
     ModpackButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     gamesRow->addWidget(ModpackButton);
 
-    SolitaireGameButton = new QPushButton("🃏 Game");
-    SolitaireGameButton->setObjectName("SolitaireGameButton");
-    SolitaireGameButton->setMinimumHeight(40);
-    SolitaireGameButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    gamesRow->addWidget(SolitaireGameButton);
-
     rightPanelLayout->addLayout(gamesRow);
 
     rightPanelLayout->addWidget(makeSep());
@@ -366,52 +360,6 @@ void MainWindow::setupTrayIcon()
 
 void MainWindow::setupConnections()
 {
-    connect(downloader, &MinecraftDownloader::downloadProgress, this,
-            [this](qint64 received, qint64 total)
-            {
-                if (total <= 0) return;
-                progressBar->show();
-                int percent = static_cast<int>((received * 100) / total);
-                progressBar->setValue(percent);
-            });
-
-    connect(downloader, &MinecraftDownloader::vanillaVersionsReceived,
-            this, &MainWindow::onVanillaVersionsReceived);
-    connect(downloader, &MinecraftDownloader::fabricVersionsReceived,
-            this, &MainWindow::onFabricVersionsReceived);
-    connect(downloader, &MinecraftDownloader::forgeVersionsReceived,
-            this, &MainWindow::onForgeVersionsReceived);
-    connect(downloader, &MinecraftDownloader::neoforgeVersionReceived,
-            this, &MainWindow::onNeoForgeVersionReceived);
-
-    connect(downloader, &MinecraftDownloader::instanceCreated, this,
-            [this](const QString& path)
-            {
-                if (m_modLoaderPending)
-                    return;
-                progressBar->hide();
-                QMessageBox::information(this, "Done", "Game installed:\n" + path);
-            });
-
-    connect(downloader, &MinecraftDownloader::errorOccurred, this,
-            [this](const QString& error)
-            {
-                QMessageBox::warning(this, "Error", error);
-            });
-
-    connect(downloader, &MinecraftDownloader::totalProgress, this,
-            [this](int percent)
-            {
-                progressBar->show();
-                progressBar->setValue(percent);
-            });
-
-    connect(downloader, &MinecraftDownloader::javaRuntimeProgress, this,
-            [this](int percent)
-            {
-                progressBar->show();
-                progressBar->setValue(percent);
-            });
 }
 
 // ==================== Installer ====================

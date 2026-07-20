@@ -1,4 +1,4 @@
-#include "minecraftdownloader.h"
+#include "MinecraftDownloader.h"
 #include <QUrl>
 #include <QNetworkRequest>
 #include <QDebug>
@@ -13,7 +13,7 @@ MinecraftDownloader::MinecraftDownloader(QObject* parent) : d{new QNetworkAccess
 
 }
 
-// ==================== DOWNLAD VANILLA VERSION ====================
+// ==================== DOWNLOAD VANILLA VERSION ====================
 
 void MinecraftDownloader::downloadVanillaVersion(
     const QString& versionJsonUrl,

@@ -30,7 +30,10 @@ foreach(source_file ${ALL_SOURCES})
     endif()
 endforeach()
 
-add_executable(yanoml ${ALL_SOURCES})
+add_executable(yanoml ${ALL_SOURCES}
+        windows/modwindow.cpp
+        windows/modwindow.h
+        windows/modwindow.ui)
 target_link_libraries(yanoml
         Qt::Core
         Qt::Gui
