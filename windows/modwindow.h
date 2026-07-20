@@ -25,7 +25,7 @@ public:
     ~modwindow() override;
 
 private:
-    Ui::modwindow *ui;
+    Ui::modwindow *m_ui;
 };
 
 

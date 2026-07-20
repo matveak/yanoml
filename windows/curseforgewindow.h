@@ -52,12 +52,12 @@ private:
     void buildModpacksTab();
 
     // === Создание виджетов ===
-    QScrollArea* createScrollArea();
-    QFrame*      createModCard(const CFMod& mod, bool isModpack);
-    QLabel*      createIconLabel(const QString& iconUrl);
-    QLabel*      createVersionsLabel(const QStringList& versions);
-    QPushButton* createInstallButton(const CFMod& mod, bool isModpack);
-    QPushButton* createWebsiteButton(const QString& url);
+    QScrollArea *createScrollArea();
+    QFrame      *createModCard(const CFMod& mod, bool isModpack);
+    QLabel      *createIconLabel(const QString& iconUrl);
+    QLabel      *createVersionsLabel(const QStringList& versions);
+    QPushButton *createInstallButton(const CFMod& mod, bool isModpack);
+    QPushButton *createWebsiteButton(const QString& url);
 
     // === Создание layout-ов карточки ===
     QVBoxLayout* createInfoLayout(const CFMod& mod);
@@ -84,27 +84,20 @@ private:
                              bool isModpack);
 
     // === Данные ===
-    WindowFrame*            frame       = nullptr;
-    CurseForgeClient*       m_cf        = nullptr;
-    SettingsWindow*         m_settings  = nullptr;
-    QNetworkAccessManager*  m_nam       = nullptr;
-
-    QTabWidget*  m_tabs     = nullptr;
-
-    // Вкладка «Моды»
-    QLineEdit*   m_modSearch   = nullptr;
-    QComboBox*   m_modVersion  = nullptr;
-    QComboBox*   m_modLoader   = nullptr;
-    QVBoxLayout* m_modCards    = nullptr;
-    QHash<int, CFMod> m_modStore;
-
-    // Вкладка «Модпаки»
-    QLineEdit*   m_packSearch  = nullptr;
-    QComboBox*   m_packVersion = nullptr;
-    QVBoxLayout* m_packCards   = nullptr;
-    QHash<int, CFMod> m_packStore;
-
-    // Статус и прогресс
-    QProgressBar* m_progress = nullptr;
-    QLabel*       m_status   = nullptr;
+    WindowFrame           *m_frame       = nullptr;
+    CurseForgeClient      *m_cf          = nullptr;
+    SettingsWindow        *m_settings    = nullptr;
+    QNetworkAccessManager *m_nam         = nullptr;
+    QTabWidget            *m_tabs        = nullptr;
+    QLineEdit             *m_modSearch   = nullptr;
+    QComboBox             *m_modVersion  = nullptr;
+    QComboBox             *m_modLoader   = nullptr;
+    QVBoxLayout           *m_modCards    = nullptr;
+    QLineEdit             *m_packSearch  = nullptr;
+    QComboBox             *m_packVersion = nullptr;
+    QVBoxLayout           *m_packCards   = nullptr;
+    QProgressBar          *m_progress    = nullptr;
+    QLabel                *m_status      = nullptr;
+    QHash<int, CFMod>      m_modStore;
+    QHash<int, CFMod>      m_packStore;
 };

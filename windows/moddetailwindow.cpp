@@ -20,14 +20,14 @@ ModDetailsWindow::ModDetailsWindow(
     const Mod& mod,
     QWidget* parent)
     : QDialog(parent),
-    currentMod(mod)
+    m_currentMod(mod)
 {
     resize(1000, 750);
     setWindowTitle(mod.name);
     setStyleSheet(Theme::dialogStyle());
 
-    api = new ModrithAPI(this);
-    manager = new QNetworkAccessManager(this);
+    m_api = new ModrithAPI(this);
+    m_manager = new QNetworkAccessManager(this);
 
     auto mainLayout =
         new QVBoxLayout(this);
@@ -41,12 +41,12 @@ ModDetailsWindow::ModDetailsWindow(
     auto* headerLayout =
         new QHBoxLayout();
 
-    iconLabel =
+    m_iconLabel =
         new QLabel(this);
 
-    iconLabel->setFixedSize(128, 128);
-    iconLabel->setScaledContents(true);
-    iconLabel->setStyleSheet(QString(
+    m_iconLabel->setFixedSize(128, 128);
+    m_iconLabel->setScaledContents(true);
+    m_iconLabel->setStyleSheet(QString(
                                  "border-radius: 12px; border: 1px solid %1; background: %2;")
                                  .arg(Theme::border().name(), Theme::panel().name()));
 
@@ -55,42 +55,42 @@ ModDetailsWindow::ModDetailsWindow(
 
     infoLayout->setSpacing(6);
 
-    titleLabel =
+    m_titleLabel =
         new QLabel(
             "<h1>" + mod.name + "</h1>");
-    titleLabel->setStyleSheet(QString("font-size: 26px; color: %1;").arg(Theme::text().name()));
+    m_titleLabel->setStyleSheet(QString("font-size: 26px; color: %1;").arg(Theme::text().name()));
 
-    authorLabel =
+    m_authorLabel =
         new QLabel(
             "Автор: " + mod.author);
-    authorLabel->setStyleSheet(QString("color: %1;").arg(Theme::textDim().name()));
+    m_authorLabel->setStyleSheet(QString("color: %1;").arg(Theme::textDim().name()));
 
-    downloadsLabel =
+    m_downloadsLabel =
         new QLabel(
             "⬇ " +
             QString::number(mod.downloads));
-    downloadsLabel->setStyleSheet(QString("color: %1;").arg(Theme::textDim().name()));
+    m_downloadsLabel->setStyleSheet(QString("color: %1;").arg(Theme::textDim().name()));
 
-    categoriesLabel =
+    m_categoriesLabel =
         new QLabel();
-    categoriesLabel->setWordWrap(true);
-    categoriesLabel->setStyleSheet(QString("color: %1;").arg(Theme::textDim().name()));
+    m_categoriesLabel->setWordWrap(true);
+    m_categoriesLabel->setStyleSheet(QString("color: %1;").arg(Theme::textDim().name()));
 
-    versionsLabel =
+    m_versionsLabel =
         new QLabel(
             "Версии: " +
             mod.versions.join(", "));
-    versionsLabel->setWordWrap(true);
-    versionsLabel->setStyleSheet(QString("color: %1;").arg(Theme::textDim().name()));
+    m_versionsLabel->setWordWrap(true);
+    m_versionsLabel->setStyleSheet(QString("color: %1;").arg(Theme::textDim().name()));
 
-    infoLayout->addWidget(titleLabel);
-    infoLayout->addWidget(authorLabel);
-    infoLayout->addWidget(downloadsLabel);
-    infoLayout->addWidget(categoriesLabel);
-    infoLayout->addWidget(versionsLabel);
+    infoLayout->addWidget(m_titleLabel);
+    infoLayout->addWidget(m_authorLabel);
+    infoLayout->addWidget(m_downloadsLabel);
+    infoLayout->addWidget(m_categoriesLabel);
+    infoLayout->addWidget(m_versionsLabel);
     infoLayout->addStretch(1);
 
-    headerLayout->addWidget(iconLabel, 0, Qt::AlignTop);
+    headerLayout->addWidget(m_iconLabel, 0, Qt::AlignTop);
     headerLayout->addSpacing(16);
     headerLayout->addLayout(infoLayout, 1);
 
@@ -98,13 +98,13 @@ ModDetailsWindow::ModDetailsWindow(
     // DESCRIPTION
     // =========================
 
-    descriptionBrowser =
+    m_descriptionBrowser =
         new QTextBrowser(this);
 
-    descriptionBrowser->setOpenExternalLinks(true);
-    descriptionBrowser->setText(
+    m_descriptionBrowser->setOpenExternalLinks(true);
+    m_descriptionBrowser->setText(
         "Загрузка описания...");
-    descriptionBrowser->setStyleSheet(QString(
+    m_descriptionBrowser->setStyleSheet(QString(
                                           "QTextBrowser { background-color: %1; border: 1px solid %2;"
                                           " border-radius: 10px; padding: 12px; color: %3; }")
                                           .arg(Theme::panel().name(), Theme::border().name(), Theme::text().name()));
@@ -121,7 +121,7 @@ ModDetailsWindow::ModDetailsWindow(
     auto* galleryWidget =
         new QWidget();
 
-    galleryLayout =
+    m_galleryLayout =
         new QVBoxLayout(galleryWidget);
 
     galleryArea->setWidget(galleryWidget);
@@ -130,20 +130,20 @@ ModDetailsWindow::ModDetailsWindow(
     // INSTALL BUTTON
     // =========================
 
-    installButton =
+    m_installButton =
         new QPushButton(
             "+ Установить мод",
             this);
-    installButton->setFixedHeight(44);
-    installButton->setCursor(Qt::PointingHandCursor);
-    installButton->setStyleSheet(QString(
+    m_installButton->setFixedHeight(44);
+    m_installButton->setCursor(Qt::PointingHandCursor);
+    m_installButton->setStyleSheet(QString(
                                      "QPushButton { background-color: %1; color: #0A0A0A; border: none;"
                                      " border-radius: 10px; font-weight: bold; font-size: 15px; }"
                                      "QPushButton:hover { background-color: #15c25e; }")
                                      .arg(Theme::accent().name()));
 
-    connect(installButton, &QPushButton::clicked, this, [this] {
-        emit installRequested(currentMod);
+    connect(m_installButton, &QPushButton::clicked, this, [this] {
+        emit installRequested(m_currentMod);
     });
 
     // =========================
@@ -151,22 +151,22 @@ ModDetailsWindow::ModDetailsWindow(
     // =========================
 
     mainLayout->addLayout(headerLayout);
-    mainLayout->addWidget(descriptionBrowser, 1);
+    mainLayout->addWidget(m_descriptionBrowser, 1);
     mainLayout->addWidget(galleryArea, 1);
-    mainLayout->addWidget(installButton);
+    mainLayout->addWidget(m_installButton);
 
     // =========================
     // SIGNALS
     // =========================
 
     connect(
-        api,
+        m_api,
         &ModrithAPI::ProjectReceived,
         this,
         &ModDetailsWindow::onProjectReceived);
 
     connect(
-        api,
+        m_api,
         &ModrithAPI::OnError,
         this,
         [](const QString& error)
@@ -174,35 +174,35 @@ ModDetailsWindow::ModDetailsWindow(
             qDebug() << error;
         });
 
-    api->getProject(
-        currentMod.id);
+    m_api->getProject(
+        m_currentMod.id);
 }
 
 void ModDetailsWindow::onProjectReceived(
     const ModProject& project)
 {
-    titleLabel->setText(
+    m_titleLabel->setText(
         "<h1>" +
         project.title +
         "</h1>");
 
-    authorLabel->setText(
+    m_authorLabel->setText(
         "Автор: " +
         project.author);
 
-    downloadsLabel->setText(
+    m_downloadsLabel->setText(
         "Загрузок: " +
         QString::number(project.downloads));
 
-    categoriesLabel->setText(
+    m_categoriesLabel->setText(
         "Категории: " +
         project.categories.join(", "));
 
 #if QT_VERSION >= QT_VERSION_CHECK(5,14,0)
-    descriptionBrowser->setMarkdown(
+    m_descriptionBrowser->setMarkdown(
         project.body);
 #else
-    descriptionBrowser->setPlainText(
+    m_descriptionBrowser->setPlainText(
         project.body);
 #endif
 
@@ -213,7 +213,7 @@ void ModDetailsWindow::onProjectReceived(
     if(!project.iconUrl.isEmpty())
     {
         QNetworkReply* reply =
-            manager->get(
+            m_manager->get(
                 QNetworkRequest(
                     QUrl(project.iconUrl)));
 
@@ -230,7 +230,7 @@ void ModDetailsWindow::onProjectReceived(
 
                 if(pix.loadFromData(data))
                 {
-                    iconLabel->setPixmap(
+                    m_iconLabel->setPixmap(
                         pix.scaled(
                             128,
                             128,
@@ -261,11 +261,11 @@ void ModDetailsWindow::onProjectReceived(
         imageLabel->setText(
             "Загрузка изображения...");
 
-        galleryLayout->addWidget(
+        m_galleryLayout->addWidget(
             imageLabel);
 
         QNetworkReply* reply =
-            manager->get(
+            m_manager->get(
                 QNetworkRequest(
                     QUrl(imageUrl)));
 

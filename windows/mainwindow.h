@@ -48,22 +48,21 @@ private slots:
     void on_InstallerButton_clicked();
 
 private:
-    QWidget      *m_centralwidget{};
-    QPushButton  *m_playButton{};
-    QPushButton  *m_platformButton{};
-    QPushButton  *m_updateButton{};
-    QPushButton  *m_elyByButton{};
-    QComboBox    *m_updateBox{};
-    QPushButton  *m_settingsButton{};
-    QPushButton  *m_pickAccountButton{};
-    QPushButton  *m_installerButton{};
-    QPushButton  *m_modpackButton{};
-    QComboBox    *m_versionBox{};
-    QMenuBar     *m_menubar{};
-    QMenu        *m_menulauncher{};
-    QStatusBar   *m_statusbar{};
-    QVBoxLayout  *m_rightPanelLayout;
-
+    QWidget             *m_centralwidget{};
+    QPushButton         *m_playButton{};
+    QPushButton         *m_platformButton{};
+    QPushButton         *m_updateButton{};
+    QPushButton         *m_elyByButton{};
+    QComboBox           *m_updateBox{};
+    QPushButton         *m_settingsButton{};
+    QPushButton         *m_pickAccountButton{};
+    QPushButton         *m_installerButton{};
+    QPushButton         *m_modpackButton{};
+    QComboBox           *m_versionBox{};
+    QMenuBar            *m_menubar{};
+    QMenu               *m_menulauncher{};
+    QStatusBar          *m_statusbar{};
+    QVBoxLayout         *m_rightPanelLayout;
     WindowFrame         *m_frame            = nullptr;
     QProgressBar        *m_progressBar      = nullptr;
     QSystemTrayIcon     *m_trayIcon         = nullptr;

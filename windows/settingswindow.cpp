@@ -48,49 +48,49 @@ SettingsWindow::SettingsWindow(QWidget* parent)
     auto* layout = new QVBoxLayout(this);
 
     // Снапшоты
-    snapshotsCheckBox = new QCheckBox("Показывать снапшоты", this);
-    snapshotsCheckBox->setChecked(globalSettings.showSnapshots);
+    m_snapshotsCheckBox = new QCheckBox("Показывать снапшоты", this);
+    m_snapshotsCheckBox->setChecked(globalSettings.showSnapshots);
 
     // Память
-    ramLabel = new QLabel(this);
-    ramSlider = new QSlider(Qt::Horizontal, this);
-    connect(ramSlider, &QSlider::valueChanged, this, [this](int value) {
-        ramLabel->setText(QString("Оперативная память: %1 ГБ").arg(value));
+    m_ramLabel = new QLabel(this);
+    m_ramSlider = new QSlider(Qt::Horizontal, this);
+    connect(m_ramSlider, &QSlider::valueChanged, this, [this](int value) {
+        m_ramLabel->setText(QString("Оперативная память: %1 ГБ").arg(value));
         emit settingsChanged();
     });
-    ramSlider->setMinimum(1);
-    ramSlider->setMaximum(32);
-    ramSlider->setValue(globalSettings.ramGb);
+    m_ramSlider->setMinimum(1);
+    m_ramSlider->setMaximum(32);
+    m_ramSlider->setValue(globalSettings.ramGb);
 
     // Никнейм
     auto* usernameLabel = new QLabel("Никнейм в игре:", this);
-    nicknameEdit = new QLineEdit(this);
-    nicknameEdit->setText(globalSettings.nickname);
+    m_nicknameEdit = new QLineEdit(this);
+    m_nicknameEdit->setText(globalSettings.nickname);
 
     // Путь к Minecraft
     auto* minecraftPathLabel = new QLabel("Путь к Minecraft:", this);
-    minecraftPathEdit = new QLineEdit(this);
-    minecraftBrowseButton = new QPushButton("Обзор...", this);
-    minecraftPathEdit->setText(globalSettings.minecraftPath);
+    m_minecraftPathEdit = new QLineEdit(this);
+    m_minecraftBrowseButton = new QPushButton("Обзор...", this);
+    m_minecraftPathEdit->setText(globalSettings.minecraftPath);
 
-    connect(minecraftBrowseButton, &QPushButton::clicked, this, [this] {
+    connect(m_minecraftBrowseButton, &QPushButton::clicked, this, [this] {
         QString dir = QFileDialog::getExistingDirectory(this, "Выберите папку Minecraft");
         if (!dir.isEmpty()) {
-            minecraftPathEdit->setText(dir);
+            m_minecraftPathEdit->setText(dir);
             emit settingsChanged();
         }
     });
 
     // Путь к Java
     auto* javaPathLabel = new QLabel("Путь к Java:", this);
-    javaPathEdit = new QLineEdit(this);
-    javaBrowseButton = new QPushButton("Обзор...", this);
-    javaPathEdit->setText(globalSettings.javaPath);
+    m_javaPathEdit = new QLineEdit(this);
+    m_javaBrowseButton = new QPushButton("Обзор...", this);
+    m_javaPathEdit->setText(globalSettings.javaPath);
 
-    connect(javaBrowseButton, &QPushButton::clicked, this, [this]{
+    connect(m_javaBrowseButton, &QPushButton::clicked, this, [this]{
         QString dir = QFileDialog::getExistingDirectory(this, "Выберите папку Java");
         if (!dir.isEmpty()) {
-            javaPathEdit->setText(dir);
+            m_javaPathEdit->setText(dir);
             emit settingsChanged();
         }
     });
@@ -101,30 +101,30 @@ SettingsWindow::SettingsWindow(QWidget* parent)
     closeButton->setObjectName("saveBtn");
 
     // Добавляем всё в layout
-    layout->addWidget(snapshotsCheckBox);
-    layout->addWidget(ramLabel);
-    layout->addWidget(ramSlider);
+    layout->addWidget(m_snapshotsCheckBox);
+    layout->addWidget(m_ramLabel);
+    layout->addWidget(m_ramSlider);
 
     layout->addWidget(usernameLabel);
-    layout->addWidget(nicknameEdit);
+    layout->addWidget(m_nicknameEdit);
 
     layout->addWidget(minecraftPathLabel);
-    layout->addWidget(minecraftPathEdit);
-    layout->addWidget(minecraftBrowseButton);
+    layout->addWidget(m_minecraftPathEdit);
+    layout->addWidget(m_minecraftBrowseButton);
 
     layout->addWidget(javaPathLabel);
-    layout->addWidget(javaPathEdit);
-    layout->addWidget(javaBrowseButton);
+    layout->addWidget(m_javaPathEdit);
+    layout->addWidget(m_javaBrowseButton);
 
     layout->addStretch();
     layout->addWidget(closeButton);
 
     connect(closeButton, &QPushButton::clicked, this, [this] {
-        globalSettings.showSnapshots = snapshotsCheckBox->isChecked();
-        globalSettings.javaPath = javaPathEdit->text();
-        globalSettings.minecraftPath = minecraftPathEdit->text();
-        globalSettings.nickname = nicknameEdit->text();
-        globalSettings.ramGb = ramSlider->value();
+        globalSettings.showSnapshots = m_snapshotsCheckBox->isChecked();
+        globalSettings.javaPath = m_javaPathEdit->text();
+        globalSettings.minecraftPath = m_minecraftPathEdit->text();
+        globalSettings.nickname = m_nicknameEdit->text();
+        globalSettings.ramGb = m_ramSlider->value();
         emit settingsChanged();
         accept();
     });

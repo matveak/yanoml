@@ -81,14 +81,14 @@ CurseForgeWindow::CurseForgeWindow(QWidget* parent)
     setStyleSheet(Theme::dialogStyle());
     resize(1300, 860);
 
-    // Window frame
-    frame = new WindowFrame(this);
-    frame->setTitle("CurseForge — Моды и Модпаки");
+    // Window m_frame
+    m_frame = new WindowFrame(this);
+    m_frame->setTitle("CurseForge — Моды и Модпаки");
 
     // ── Переключатель источника модов — прямо в шапке окна ───────────
     // (слева от кнопок свернуть/закрыть, без выпадающего меню)
     {
-        auto* switcherLayout = frame->titleBar()->rightLayout();
+        auto* switcherLayout = m_frame->titleBar()->rightLayout();
 
         const QString switchBtnStyle =
             "QPushButton { border: none; border-radius: 6px; background: transparent; }"
@@ -96,7 +96,7 @@ CurseForgeWindow::CurseForgeWindow(QWidget* parent)
             "QPushButton:pressed { background: rgba(255, 255, 255, 42); }"
             "QPushButton:disabled { background: rgba(241, 100, 54, 40); }";
 
-        auto* modrinthBtn = new QPushButton(frame->titleBar());
+        auto* modrinthBtn = new QPushButton(m_frame->titleBar());
         modrinthBtn->setIcon(Theme::platformIcon(QColor("#1BD96A"), "M"));
         modrinthBtn->setIconSize(QSize(18, 18));
         modrinthBtn->setFixedSize(28, 26);
@@ -105,7 +105,7 @@ CurseForgeWindow::CurseForgeWindow(QWidget* parent)
         modrinthBtn->setToolTip("Открыть Modrinth");
         modrinthBtn->setStyleSheet(switchBtnStyle);
 
-        auto* curseforgeBtn = new QPushButton(frame->titleBar());
+        auto* curseforgeBtn = new QPushButton(m_frame->titleBar());
         curseforgeBtn->setIcon(Theme::platformIcon(QColor("#F16436"), "C"));
         curseforgeBtn->setIconSize(QSize(18, 18));
         curseforgeBtn->setFixedSize(28, 26);
@@ -125,7 +125,7 @@ CurseForgeWindow::CurseForgeWindow(QWidget* parent)
         switcherLayout->insertWidget(0, modrinthBtn);
         switcherLayout->insertWidget(1, curseforgeBtn);
 
-        auto* sep = new QFrame(frame->titleBar());
+        auto* sep = new QFrame(m_frame->titleBar());
         sep->setFixedWidth(1);
         sep->setFixedHeight(16);
         sep->setStyleSheet(QString("background-color: %1;").arg(Theme::border().name()));
@@ -135,9 +135,9 @@ CurseForgeWindow::CurseForgeWindow(QWidget* parent)
     auto* rootLayout = new QVBoxLayout(this);
     rootLayout->setContentsMargins(0, 0, 0, 0);
     rootLayout->setSpacing(0);
-    rootLayout->addWidget(frame);
+    rootLayout->addWidget(m_frame);
 
-    auto* contentLayout = new QVBoxLayout(frame->contentWidget());
+    auto* contentLayout = new QVBoxLayout(m_frame->contentWidget());
     contentLayout->setContentsMargins(16, 16, 16, 16);
     contentLayout->setSpacing(12);
 

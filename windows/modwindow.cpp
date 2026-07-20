@@ -8,10 +8,10 @@
 #include "ui_modwindow.h"
 
 
-modwindow::modwindow(QWidget *parent) : QWidget(parent), ui(new Ui::modwindow) {
-    ui->setupUi(this);
+modwindow::modwindow(QWidget *parent) : QWidget(parent), m_ui(new Ui::modwindow) {
+    m_ui->setupUi(this);
 }
 
 modwindow::~modwindow() {
-    delete ui;
+    delete m_ui;
 }

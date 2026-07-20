@@ -123,7 +123,7 @@ QString MinecraftLauncher::getCrashHint(int neededJava, const QString& javaPath)
 
 void MinecraftLauncher::ensureJava(const QString& mcVersion,
                             const QString& gameDir,
-                            std::function<void(QString)> cb, const QString& jp)
+                            const std::function<void(QString)>& cb, const QString& jp)
 {
 	int requiredMajor = requiredJavaMajor(mcVersion);
 

@@ -15,33 +15,25 @@ class ModDetailsWindow : public QDialog
     Q_OBJECT
 
 public:
-    explicit ModDetailsWindow(
-        const Mod& mod,
-        QWidget* parent = nullptr);
+    explicit ModDetailsWindow(const Mod& mod, QWidget* parent = nullptr);
 
 signals:
     void installRequested(const Mod& mod);
 
 private slots:
-    void onProjectReceived(
-        const ModProject& project);
+    void onProjectReceived(const ModProject& project);
 
 private:
-    Mod currentMod;
-
-    ModrithAPI* api = nullptr;
-    QNetworkAccessManager* manager = nullptr;
-
-    QLabel* iconLabel = nullptr;
-    QLabel* titleLabel = nullptr;
-    QLabel* authorLabel = nullptr;
-    QLabel* downloadsLabel = nullptr;
-    QLabel* categoriesLabel = nullptr;
-    QLabel* versionsLabel = nullptr;
-
-    QTextBrowser* descriptionBrowser = nullptr;
-
-    QPushButton* installButton = nullptr;
-
-    QVBoxLayout* galleryLayout = nullptr;
+    ModrithAPI            *m_api                = nullptr;
+    QNetworkAccessManager *m_manager            = nullptr;
+    QLabel                *m_iconLabel          = nullptr;
+    QLabel                *m_titleLabel         = nullptr;
+    QLabel                *m_authorLabel        = nullptr;
+    QLabel                *m_downloadsLabel     = nullptr;
+    QLabel                *m_categoriesLabel    = nullptr;
+    QLabel                *m_versionsLabel      = nullptr;
+    QTextBrowser          *m_descriptionBrowser = nullptr;
+    QPushButton           *m_installButton      = nullptr;
+    QVBoxLayout           *m_galleryLayout      = nullptr;
+    Mod                    m_currentMod;
 };

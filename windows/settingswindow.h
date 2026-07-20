@@ -20,16 +20,12 @@ signals:
     void settingsChanged();
 
 private:
-    QCheckBox* snapshotsCheckBox = nullptr;
-    QSlider* ramSlider = nullptr;
-    QLabel* ramLabel = nullptr;
-
-    QLineEdit* minecraftPathEdit = nullptr;
-    QPushButton* minecraftBrowseButton = nullptr;
-
-    QLineEdit* javaPathEdit = nullptr;
-    QPushButton* javaBrowseButton = nullptr;
-
-
-    QLineEdit* nicknameEdit = nullptr;   // ← Новое поле
+    QCheckBox   *m_snapshotsCheckBox     = nullptr;
+    QSlider     *m_ramSlider             = nullptr;
+    QLabel      *m_ramLabel              = nullptr;
+    QLineEdit   *m_minecraftPathEdit     = nullptr;
+    QPushButton *m_minecraftBrowseButton = nullptr;
+    QLineEdit   *m_javaPathEdit          = nullptr;
+    QPushButton *m_javaBrowseButton      = nullptr;
+    QLineEdit   *m_nicknameEdit          = nullptr;   // ← Новое поле
 };
