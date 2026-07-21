@@ -1,4 +1,4 @@
-#include "curseforgewindow.h"
+#include "modsbrowserwindow.h"
 #include "settingswindow.h"
 #include "modwindow.h"
 #include "../ui/theme.h"

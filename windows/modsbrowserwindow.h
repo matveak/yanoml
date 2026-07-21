@@ -3,6 +3,8 @@
 #include <QDialog>
 #include <QHash>
 #include <QSaveFile>
+
+#include "../curseforgeclient.h"
 #include "../modsapi.h"
 
 // Forward declarations
@@ -71,7 +73,7 @@ private:
     void handleFilesReceived(const ModInfo& mod, const QVector<FileInfo>& files, bool isModpack);
 
 
-    ModsAPI               *m_apis[2]     = {};
+    ModsAPI               *m_apis[2]     = {new CurseForgeClient};
     WindowFrame           *m_frame       = nullptr;
     QNetworkAccessManager *m_nam         = nullptr;
     QTabWidget            *m_tabs        = nullptr;

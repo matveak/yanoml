@@ -171,8 +171,8 @@ void CreateModpackWindow::onVersionsLoaded(
     for(const auto& v : versions)
     {
         // Показываем только release-версии (снапшоты не нужны при создании сборки)
-        if(v.loaderType == "release")
-            m_versionBox->addItem(v.gameVersion);
+        if(v.m_loaderType == "release")
+            m_versionBox->addItem(v.m_gameVersion);
     }
 
     qDebug() << "CreateModpackWindow: loaded" << m_versionBox->count() << "release versions";
