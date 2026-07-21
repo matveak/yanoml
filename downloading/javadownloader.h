@@ -7,10 +7,13 @@
 
 #include "downloader.h"
 
+
 class JavaDownloader : public Downloader {
 	Q_OBJECT
 	public:
 	explicit JavaDownloader(const Downloader &downloader);
+
+	JavaDownloader(QNetworkAccessManager * manager);
 
 	void downloadJavaRuntime(const QString &component, const QString &outputDir);
 

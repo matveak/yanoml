@@ -5,7 +5,9 @@
 #include <QVector>
 #include "downloading/downloader.h"
 #include "downloading/javadownloader.h"
+#include "downloading/loaderinstaller.h"
 #include "downloading/manifestdownloader.h"
+#include "downloading/minecraftdownloader.h"
 
 struct MinecraftVersion;
 
@@ -15,19 +17,8 @@ class MinecraftInstaller : public QObject
 public:
     explicit MinecraftInstaller(QObject* parent = nullptr);
 
-    void downloadVanillaVersion(const QString& versionJsonUrl, const QString& outputJarPath);
     void createInstance(const QString& minecraftVersion, const QString& modLoader, const QString& modLoaderVersion, const QString& instancePath);
     void downloadJavaRuntime(const QString& component, const QString& outputDir);
-    void installFabric(const QString& mcVersion, const QString& gameDir);
-    void installForgeLike(const QString& mcVersion, const QString& loader,
-                          const QString& javaExe, const QString& gameDir);
-    static QString findInstalledLoaderId(const QString& gameDir,
-                                         const QString& loader,
-                                         const QString& mcVersion);
-    //TODO: private
-    Downloader d;
-    ManifestDownloader md;
-    JavaDownloader jd;
 
 signals:
     void vanillaVersionsReceived(const QVector<MinecraftVersion>& versions);
@@ -43,18 +34,9 @@ signals:
     void javaRuntimeReady(const QString& javaExecutable);
     void loaderInstalled(const QString& versionId);
 private:
-
-    int totalFiles = 0;
-    int completedFiles = 0;
-    void downloadAssetObject(const QUrl& url,
-                             const QString& outputPath,
-                             const QString& expectedHash,
-                             int* downloaded,
-                             int total,
-                             const QString& instancePath,
-                             int attempt);
-    void markAssetDone(int* downloaded, int total, const QString& instancePath);
-    void runLoaderInstaller(const QUrl& installerUrl, const QString& mcVersion,
-                            const QString& loader, const QString& javaExe,
-                            const QString& gameDir);
+    QNetworkAccessManager *m_manager;
+    ManifestDownloader m_manifestDownloader;
+    MinecraftDownloader m_minecraftDownloader;
+    JavaDownloader m_javaDownloader;
+    LoaderInstaller m_loaderInstaller;
 };
