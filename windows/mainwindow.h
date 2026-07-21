@@ -12,7 +12,7 @@
 #include <QTimer>
 #include <QTextEdit>
 #include  <QComboBox>
-#include "../minecraftdownloader.h"
+#include "../minecraftinstaller.h"
 #include "settingswindow.h"
 #include "../MinecraftLauncher.h"
 

@@ -7,7 +7,7 @@
 #include <QMap>
 #include <QProcess>
 
-#include "minecraftdownloader.h"
+#include "minecraftinstaller.h"
 
 class MinecraftLauncher : public QObject {
 	Q_OBJECT

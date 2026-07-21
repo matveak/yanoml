@@ -1,5 +1,6 @@
+#include "minecraftinstaller.h"
+
 #include "downloading/minecraftdownloader.h"
-#include "minecraftdownloader.h"
 #include <QUrl>
 #include <QDir>
 #include <QFileInfo>
@@ -8,14 +9,14 @@
 #include <QProcess>
 #include <QSaveFile>
 
-MinecraftDownloader::MinecraftDownloader(QObject* parent) : d{new QNetworkAccessManager(parent), parent}, md{d}, jd{d}
+MinecraftInstaller::MinecraftInstaller(QObject* parent) : d{new QNetworkAccessManager(parent), parent}, md{d}, jd{d}
 {
 
 }
 
 // ==================== DOWNLOAD VANILLA VERSION ====================
 
-void MinecraftDownloader::downloadVanillaVersion(
+void MinecraftInstaller::downloadVanillaVersion(
     const QString& versionJsonUrl,
     const QString& outputJar)
 {
@@ -46,7 +47,7 @@ void MinecraftDownloader::downloadVanillaVersion(
 
 // ==================== ASSET OBJECT ====================
 
-void MinecraftDownloader::markAssetDone(int* downloaded, int total,
+void MinecraftInstaller::markAssetDone(int* downloaded, int total,
                                         const QString& instancePath)
 {
     ++(*downloaded);
@@ -59,7 +60,7 @@ void MinecraftDownloader::markAssetDone(int* downloaded, int total,
     }
 }
 
-void MinecraftDownloader::downloadAssetObject(const QUrl& url,
+void MinecraftInstaller::downloadAssetObject(const QUrl& url,
                                               const QString& outputPath,
                                               const QString& expectedHash,
                                               const int* downloaded,
@@ -153,7 +154,7 @@ void MinecraftDownloader::downloadAssetObject(const QUrl& url,
 
 // ==================== MOD LOADERS ====================
 
-QString MinecraftDownloader::findInstalledLoaderId(const QString& gameDir,
+QString MinecraftInstaller::findInstalledLoaderId(const QString& gameDir,
                                                    const QString& loader,
                                                    const QString& mcVersion)
 {
@@ -197,7 +198,7 @@ QString MinecraftDownloader::findInstalledLoaderId(const QString& gameDir,
     return best;
 }
 
-void MinecraftDownloader::installFabric(const QString& mcVersion, const QString& gameDir)
+void MinecraftInstaller::installFabric(const QString& mcVersion, const QString& gameDir)
 {
 
     /*
@@ -416,7 +417,7 @@ static QString pickNeoForgeMavenForMc(const QString& xml, const QString& mcVersi
     return best;
 }
 
-void MinecraftDownloader::installForgeLike(const QString& mcVersion,
+void MinecraftInstaller::installForgeLike(const QString& mcVersion,
                                            const QString& loader,
                                            const QString& javaExe,
                                            const QString& gameDir)
@@ -498,7 +499,7 @@ void MinecraftDownloader::installForgeLike(const QString& mcVersion,
     }
 }
 
-void MinecraftDownloader::runLoaderInstaller(const QUrl& installerUrl,
+void MinecraftInstaller::runLoaderInstaller(const QUrl& installerUrl,
                                              const QString& mcVersion,
                                              const QString& loader,
                                              const QString& javaExe,
@@ -595,7 +596,7 @@ void MinecraftDownloader::runLoaderInstaller(const QUrl& installerUrl,
     }
 
     connect(r, &QNetworkReply::downloadProgress,
-            this, &MinecraftDownloader::downloadProgress);
+            this, &MinecraftInstaller::downloadProgress);
     connect(r, &QNetworkReply::readyRead, this,
             [r, f] { f->write(r->readAll()); });
 

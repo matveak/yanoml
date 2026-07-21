@@ -4,10 +4,10 @@
 
 #ifndef MINECRAFTDOWNLOADER_H
 #define MINECRAFTDOWNLOADER_H
+#include "downloader.h"
 
 
-
-class MinecraftDownloader {
+class MinecraftDownloader : public Downloader {
 
 };
 

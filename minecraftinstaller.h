@@ -9,11 +9,11 @@
 
 struct MinecraftVersion;
 
-class MinecraftDownloader : public QObject
+class MinecraftInstaller : public QObject
 {
     Q_OBJECT
 public:
-    explicit MinecraftDownloader(QObject* parent = nullptr);
+    explicit MinecraftInstaller(QObject* parent = nullptr);
 
     void downloadVanillaVersion(const QString& versionJsonUrl, const QString& outputJarPath);
     void createInstance(const QString& minecraftVersion, const QString& modLoader, const QString& modLoaderVersion, const QString& instancePath);

@@ -4,7 +4,7 @@
 #include <QJsonArray>
 #include <QJsonObject>
 
-#include "../minecraftdownloader.h"
+#include "../minecraftinstaller.h"
 
 class MinecraftDownloader;
 class WindowFrame;
