@@ -4,6 +4,7 @@
 #include <QUrl>
 #include <QDir>
 #include <QFileInfo>
+#include <QJsonObject>
 #include <QNetworkReply>
 #include <QTimer>
 #include <QProcess>
@@ -20,7 +21,7 @@ void MinecraftInstaller::downloadVanillaVersion(
     const QString& versionJsonUrl,
     const QString& outputJar)
 {
-    QNetworkReply* reply = d.manager->get(QNetworkRequest(QUrl(versionJsonUrl)));
+    QNetworkReply* reply = d.m_manager->get(QNetworkRequest(QUrl(versionJsonUrl)));
 
     connect(reply, &QNetworkReply::finished, this, [this, reply, outputJar]
             {
@@ -68,7 +69,7 @@ void MinecraftInstaller::downloadAssetObject(const QUrl& url,
                                               const QString& instancePath,
                                               int attempt)
 {
-    QNetworkReply*      reply = d.manager->get(QNetworkRequest(url));
+    QNetworkReply*      reply = d.m_manager->get(QNetworkRequest(url));
     auto file  = new QSaveFile(outputPath);
     auto sha1  = new QCryptographicHash(QCryptographicHash::Sha1);
 
@@ -424,7 +425,7 @@ void MinecraftInstaller::installForgeLike(const QString& mcVersion,
 {
     if (loader == "forge")
     {
-        QNetworkReply* promoReply = d.manager->get(QNetworkRequest(QUrl(
+        QNetworkReply* promoReply = d.m_manager->get(QNetworkRequest(QUrl(
             "https://files.minecraftforge.net/net/minecraftforge/forge/"
             "promotions_slim.json")));
 
@@ -463,7 +464,7 @@ void MinecraftInstaller::installForgeLike(const QString& mcVersion,
     }
     else // neoforge
     {
-        QNetworkReply* metaReply = d.manager->get(QNetworkRequest(QUrl(
+        QNetworkReply* metaReply = d.m_manager->get(QNetworkRequest(QUrl(
             "https://maven.neoforged.net/releases/net/neoforged/neoforge/"
             "maven-metadata.xml")));
 
@@ -584,7 +585,7 @@ void MinecraftInstaller::runLoaderInstaller(const QUrl& installerUrl,
         return;
     }
 
-    QNetworkReply* r = d.manager->get(QNetworkRequest(installerUrl));
+    QNetworkReply* r = d.m_manager->get(QNetworkRequest(installerUrl));
     auto* f = new QSaveFile(installerPath);
 
     if (!f->open(QIODevice::WriteOnly))
