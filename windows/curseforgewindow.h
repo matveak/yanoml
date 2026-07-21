@@ -1,11 +1,9 @@
 #pragma once
 
 #include <QDialog>
-#include <QVector>
 #include <QHash>
-#include <QUrl>
 #include <QSaveFile>
-#include "../curseforgeclient.h"
+#include "../modsapi.h"
 
 // Forward declarations
 class WindowFrame;
@@ -26,24 +24,22 @@ class QTabWidget;
 class QFrame;
 class QLayout;
 
-class CurseForgeWindow : public QDialog
+
+class ModsBrowserWindow : public QDialog
 {
     Q_OBJECT
 
 public:
-    explicit CurseForgeWindow(QWidget* parent = nullptr);
-    void setSettingsWindow(SettingsWindow* sw) { m_settings = sw; }
+    explicit ModsBrowserWindow(QWidget* parent = nullptr);
 
 private slots:
-    // Слоты — только те методы, что подключаются к сигналам Qt
     void onSearch();
     void onTabChanged(int index);
-    void onModsReceived(const QVector<CFMod>& mods);
-    void onModpacksReceived(const QVector<CFMod>& packs);
+    void onModsReceived(const QVector<ModInfo>& mods);
+    void onModpacksReceived(const QVector<ModInfo>& packs);
     void onError(const QString& error);
 
 private:
-    // === Инициализация UI ===
     void setupConnections();
     void buildHeader(QVBoxLayout* layout);
     void buildProgressSection(QVBoxLayout* layout);
@@ -51,42 +47,32 @@ private:
     void buildModsTab();
     void buildModpacksTab();
 
-    // === Создание виджетов ===
     QScrollArea *createScrollArea();
-    QFrame      *createModCard(const CFMod& mod, bool isModpack);
+    QFrame      *createModCard(const ModInfo& mod, bool isModpack);
     QLabel      *createIconLabel(const QString& iconUrl);
     QLabel      *createVersionsLabel(const QStringList& versions);
-    QPushButton *createInstallButton(const CFMod& mod, bool isModpack);
+    QPushButton *createInstallButton(const ModInfo& mod, bool isModpack);
     QPushButton *createWebsiteButton(const QString& url);
+    QVBoxLayout *createInfoLayout(const ModInfo& mod);
+    QVBoxLayout *createActionsLayout(const ModInfo& mod, bool isModpack);
 
-    // === Создание layout-ов карточки ===
-    QVBoxLayout* createInfoLayout(const CFMod& mod);
-    QVBoxLayout* createActionsLayout(const CFMod& mod, bool isModpack);
-
-    // === Отображение и очистка ===
-    void displayMods(const QVector<CFMod>& mods,
-                     QVBoxLayout* layout,
-                     QHash<int, CFMod>& store,
-                     bool isModpack);
+    void displayMods(const QVector<ModInfo>& mods, QVBoxLayout* layout, QHash<int, ModInfo>& store, bool isModpack);
     void clearLayout(QVBoxLayout* layout);
     void clearNestedLayout(QLayout* layout);
 
-    // === Сеть и загрузка ===
+    void buildAPITabs();
+    ModsAPI *currentAPI() const;
+
     void downloadIconAsync(const QString& url, QLabel* target);
     void downloadFile(const QUrl& url, const QString& fileName, bool isModpack);
-    void handleDownloadFinished(QNetworkReply* reply,
-                                QSaveFile* saveFile,
-                                const QString& fileName,
-                                const QString& savePath);
-    void installItem(const CFMod& mod, bool isModpack);
-    void handleFilesReceived(const CFMod& mod,
-                             const QVector<CFFileInfo>& files,
-                             bool isModpack);
+    void handleDownloadFinished(QNetworkReply* reply, QSaveFile* saveFile, const QString& fileName, const QString& savePath);
+    void installItem(const ModInfo& mod, bool isModpack);
 
-    // === Данные ===
+    void handleFilesReceived(const ModInfo& mod, const QVector<FileInfo>& files, bool isModpack);
+
+
+    ModsAPI               *m_apis[2]     = {};
     WindowFrame           *m_frame       = nullptr;
-    CurseForgeClient      *m_cf          = nullptr;
-    SettingsWindow        *m_settings    = nullptr;
     QNetworkAccessManager *m_nam         = nullptr;
     QTabWidget            *m_tabs        = nullptr;
     QLineEdit             *m_modSearch   = nullptr;
@@ -98,6 +84,7 @@ private:
     QVBoxLayout           *m_packCards   = nullptr;
     QProgressBar          *m_progress    = nullptr;
     QLabel                *m_status      = nullptr;
-    QHash<int, CFMod>      m_modStore;
-    QHash<int, CFMod>      m_packStore;
+    QTabWidget            *m_apiTabs;
+    QHash<int, ModInfo>      m_modStore;
+    QHash<int, ModInfo>      m_packStore;
 };

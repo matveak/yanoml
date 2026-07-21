@@ -7,10 +7,8 @@
 #include <QDesktopServices>
 #include <QMenuBar>
 #include <QBoxLayout>
-#include "../ui/theme.h"
 #include "../ui/titlebar.h"
 #include "../ui/windowframe.h"
-#include <QMap>
 #include <QTimer>
 #include <QTextEdit>
 #include  <QComboBox>

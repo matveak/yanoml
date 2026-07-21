@@ -1,188 +1,388 @@
 #include "curseforgeclient.h"
+
+#include <QColor>
 #include <QNetworkRequest>
-#include <QUrlQuery>
-#include <QDebug>
+#include <QSet>
 
-CurseForgeClient::CurseForgeClient(QObject* parent) : QObject(parent) {}
+//=====================================================
+// Constructor
+//=====================================================
 
-// ── Вспомогательный GET ───────────────────────────────────────────────────────
-QNetworkReply* CurseForgeClient::apiGet(const QString& path, const QUrlQuery& q)
-{
+CurseForgeClient::CurseForgeClient(QObject *parent) : ModsAPI(parent) {}
+
+//=====================================================
+// API info
+//=====================================================
+
+QString CurseForgeClient::name() const {
+    return "CurseForge";
+}
+
+QColor CurseForgeClient::accentColor() const {
+    return {"#F16436"};
+}
+
+QStringList CurseForgeClient::minecraftVersions() const {
+    return {
+        "Любая версия",
+
+        "1.21.4",
+        "1.21.3",
+        "1.21.1",
+        "1.21",
+
+        "1.20.6",
+        "1.20.4",
+        "1.20.1",
+        "1.20",
+
+        "1.19.4",
+        "1.19.2",
+        "1.19",
+
+        "1.18.2",
+        "1.18",
+
+        "1.17.1",
+
+        "1.16.5",
+        "1.16.1",
+
+        "1.15.2",
+        "1.14.4",
+        "1.12.2",
+        "1.8.9",
+        "1.7.10"
+    };
+}
+
+QStringList CurseForgeClient::loaders() const {
+    return {
+        "Любой загрузчик",
+        "Forge",
+        "Fabric",
+        "NeoForge",
+        "Quilt"
+    };
+}
+
+QNetworkReply *CurseForgeClient::apiGet(const QString &path, const QUrlQuery &query) {
     QUrl url(m_base + path);
-    if (!q.isEmpty()) url.setQuery(q);
 
-    QNetworkRequest req(url);
-    req.setRawHeader("Accept",    "application/json");
-    req.setRawHeader("x-api-key", m_apiKey.toUtf8());
-    req.setRawHeader("User-Agent","ZXCrackLauncher/1.0 (Qt)");
-    return m_nam.get(req);
-}
-
-// ── Парсинг одного мода/модпака ───────────────────────────────────────────────
-CFMod CurseForgeClient::parseMod(const QJsonObject& obj)
-{
-    CFMod m;
-    m.id          = obj["id"].toInt();
-    m.name        = obj["name"].toString();
-    m.summary     = obj["summary"].toString();
-    m.slug        = obj["slug"].toString();
-    m.classId     = obj["classId"].toInt();
-    m.downloadCount = static_cast<quint64>(obj["downloadCount"].toDouble());
-    m.websiteUrl  = obj["links"].toObject()["websiteUrl"].toString();
-
-    // Иконка
-    QJsonObject logo = obj["logo"].toObject();
-    m.iconUrl = logo["thumbnailUrl"].toString();
-    if (m.iconUrl.isEmpty()) m.iconUrl = logo["url"].toString();
-
-    // Авторы
-    QJsonArray authors = obj["authors"].toArray();
-    if (!authors.isEmpty())
-        m.author = authors.first().toObject()["name"].toString();
-
-    // Версии Minecraft
-    QJsonArray latestFiles = obj["latestFilesIndexes"].toArray();
-    QSet<QString> versionSet;
-    for (const auto& fv : latestFiles) {
-        QString v = fv.toObject()["gameVersion"].toString();
-        if (!v.isEmpty()) versionSet.insert(v);
+    if (!query.isEmpty()) {
+        url.setQuery(query);
     }
-    m.gameVersions = QVector<QString>(versionSet.begin(), versionSet.end());
 
-    // Категории
-    QJsonArray cats = obj["categories"].toArray();
-    for (const auto& c : cats)
-        m.categories.push_back(c.toObject()["name"].toString());
+    QNetworkRequest request(url);
 
-    return m;
+    request.setRawHeader("Accept", "application/json");
+    request.setRawHeader("x-api-key", m_apiKey.toUtf8());
+    request.setRawHeader("User-Agent", "ZXCrackLauncher/1.0 (Qt)");
+
+    return m_nam.get(request);
 }
 
-// ── Парсинг файла ─────────────────────────────────────────────────────────────
-CFFileInfo CurseForgeClient::parseFile(const QJsonObject& obj)
-{
-    CFFileInfo f;
-    f.id          = obj["id"].toInt();
-    f.displayName = obj["displayName"].toString();
-    f.fileName    = obj["fileName"].toString();
-    f.downloadUrl = obj["downloadUrl"].toString();
+ModInfo CurseForgeClient::parseMod(const QJsonObject &object) {
+    ModInfo mod;
 
-    QJsonArray gv = obj["gameVersions"].toArray();
-    for (const auto& v : gv)
-        f.gameVersions.push_back(v.toString());
+    mod.id = object["id"].toInt();
+    mod.name = object["name"].toString();
+    mod.summary = object["summary"].toString();
+    mod.downloadCount = static_cast<quint64>(object["downloadCount"].toDouble());
 
-    return f;
+    mod.websiteUrl = object["links"].toObject()["websiteUrl"].toString();
+
+    const auto logo = object["logo"].toObject();
+
+    mod.iconUrl = logo["thumbnailUrl"].toString();
+
+    if (mod.iconUrl.isEmpty()) {
+        mod.iconUrl = logo["url"].toString();
+    }
+
+    //----------------------------
+    // author
+    //----------------------------
+
+    const auto authors = object["authors"].toArray();
+
+    if (!authors.isEmpty()) {
+        mod.author = authors.first().toObject()["name"].toString();
+    }
+
+    //----------------------------
+    // versions
+    //----------------------------
+
+    QSet<QString> versions;
+
+    const auto latestFiles = object["latestFilesIndexes"].toArray();
+
+    for (const auto &version: latestFiles) {
+        const QString v = version.toObject()["gameVersion"].toString();
+
+        if (!v.isEmpty()) {
+            versions.insert(v);
+        }
+    }
+
+    mod.gameVersions = QStringList(versions.begin(),versions.end());
+
+    return mod;
 }
 
-// ── Поиск модов ───────────────────────────────────────────────────────────────
-void CurseForgeClient::searchMods(const QString& query,
-                                  const QString& mcVersion,
-                                  const QString& loader,
-                                  CFProjectType  type,
-                                  int pageSize,
-                                  int index)
-{
+FileInfo CurseForgeClient::parseFile(
+    const QJsonObject &object) {
+    FileInfo file;
+
+    file.id  = object["id"].toInt();
+
+    file.fileName  = object["fileName"].toString();
+
+    file.downloadUrl  = object["downloadUrl"].toString();
+
+    return file;
+}
+
+//=====================================================
+// Search
+//=====================================================
+
+void CurseForgeClient::searchMods(
+    const QString &query,
+    const QString &mcVersion,
+    const QString &loader) {
+    search(
+        query,
+        mcVersion,
+        loader,
+        false);
+}
+
+void CurseForgeClient::searchModpacks(
+    const QString &query,
+    const QString &mcVersion) {
+    search(
+        query,
+        mcVersion,
+        "",
+        true);
+}
+
+void CurseForgeClient::search(
+    const QString &query,
+    const QString &mcVersion,
+    const QString &loader,
+    bool modpacks,
+    int pageSize,
+    int index) {
     QUrlQuery q;
-    q.addQueryItem("gameId",       "432"); // Minecraft
-    q.addQueryItem("classId",      QString::number(static_cast<int>(type)));
-    q.addQueryItem("searchFilter", query.isEmpty() ? "" : query);
-    q.addQueryItem("pageSize",     QString::number(pageSize));
-    q.addQueryItem("index",        QString::number(index));
-    q.addQueryItem("sortField",    "2"); // Popularity
-    q.addQueryItem("sortOrder",    "desc");
 
-    if (!mcVersion.isEmpty() && mcVersion != "Любая версия")
-        q.addQueryItem("gameVersion", mcVersion);
+    q.addQueryItem("gameId", "432");
+    q.addQueryItem(
+        "classId",
+        modpacks ? "4471" : "6");
 
-    // modLoaderType: 1=Forge, 4=Fabric, 6=NeoForge, 5=Quilt
-    if (!loader.isEmpty() && loader != "Любой загрузчик") {
-        QString l = loader.toLower();
-        if      (l == "forge")    q.addQueryItem("modLoaderType", "1");
-        else if (l == "fabric")   q.addQueryItem("modLoaderType", "4");
-        else if (l == "neoforge") q.addQueryItem("modLoaderType", "6");
-        else if (l == "quilt")    q.addQueryItem("modLoaderType", "5");
+    q.addQueryItem(
+        "searchFilter",
+        query);
+
+    q.addQueryItem(
+        "pageSize",
+        QString::number(pageSize));
+
+    q.addQueryItem(
+        "index",
+        QString::number(index));
+
+    q.addQueryItem(
+        "sortField",
+        "2");
+
+    q.addQueryItem(
+        "sortOrder",
+        "desc");
+
+    //-----------------------------------
+    // MC version
+    //-----------------------------------
+
+    if (!mcVersion.isEmpty() &&
+        mcVersion != "Любая версия") {
+        q.addQueryItem(
+            "gameVersion",
+            mcVersion);
     }
 
-    QNetworkReply* reply = apiGet("/mods/search", q);
-    connect(reply, &QNetworkReply::finished, this, [this, reply, type]() {
-        reply->deleteLater();
-        if (reply->error() != QNetworkReply::NoError) {
-            emit errorOccurred("CurseForge: " + reply->errorString());
-            return;
-        }
-        QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
-        QJsonArray data = doc.object()["data"].toArray();
-        QVector<CFMod> mods;
-        for (const auto& item : data)
-            mods.push_back(parseMod(item.toObject()));
+    //-----------------------------------
+    // Loader
+    //-----------------------------------
 
-        if (type == CFProjectType::ModPack)
-            emit modpacksReceived(mods);
-        else
-            emit modsReceived(mods);
-    });
+    if (!loader.isEmpty() &&
+        loader != "Любой загрузчик") {
+        const QString l  = loader.toLower();
+
+        if (l == "forge")
+            q.addQueryItem(
+                "modLoaderType", "1");
+
+        else if (l == "fabric")
+            q.addQueryItem(
+                "modLoaderType", "4");
+
+        else if (l == "neoforge")
+            q.addQueryItem(
+                "modLoaderType", "6");
+
+        else if (l == "quilt")
+            q.addQueryItem(
+                "modLoaderType", "5");
+    }
+
+    //-----------------------------------
+    // Request
+    //-----------------------------------
+
+    auto *reply  = apiGet("/mods/search", q);
+
+    connect(
+        reply,
+        &QNetworkReply::finished,
+        this,
+        [this, reply, modpacks]() {
+            reply->deleteLater();
+
+            if (reply->error() != QNetworkReply::NoError) {
+                emit errorOccurred(
+                    "CurseForge: "
+                    + reply->errorString());
+
+                return;
+            }
+
+            const auto document  = QJsonDocument::fromJson(
+                        reply->readAll());
+
+            const auto data  = document.object()["data"]
+                    .toArray();
+
+            QVector<ModInfo> result;
+
+            for (const auto &item: data) {
+                result.push_back(
+                    parseMod(
+                        item.toObject()));
+            }
+
+            if (modpacks) {
+                emit modpacksReceived(
+                    result);
+            } else {
+                emit modsReceived(
+                    result);
+            }
+        });
 }
 
-void CurseForgeClient::searchModpacks(const QString& query,
-                                      const QString& mcVersion,
-                                      int pageSize, int index)
-{
-    searchMods(query, mcVersion, "", CFProjectType::ModPack, pageSize, index);
-}
+//=====================================================
+// Files
+//=====================================================
 
-// ── Файлы проекта ─────────────────────────────────────────────────────────────
-void CurseForgeClient::getProjectFiles(int projectId,
-                                       const QString& mcVersion,
-                                       const QString& loader)
-{
+void CurseForgeClient::getProjectFiles(
+    int projectId,
+    const QString &mcVersion,
+    const QString &loader) {
     QUrlQuery q;
-    q.addQueryItem("pageSize", "50");
-    if (!mcVersion.isEmpty() && mcVersion != "Любая версия")
-        q.addQueryItem("gameVersion", mcVersion);
-    if (!loader.isEmpty() && loader != "Любой загрузчик") {
-        QString l = loader.toLower();
-        if      (l == "forge")    q.addQueryItem("modLoaderType", "1");
-        else if (l == "fabric")   q.addQueryItem("modLoaderType", "4");
-        else if (l == "neoforge") q.addQueryItem("modLoaderType", "6");
-        else if (l == "quilt")    q.addQueryItem("modLoaderType", "5");
+
+    q.addQueryItem(
+        "pageSize",
+        "50");
+
+    //-----------------------------------
+    // MC version
+    //-----------------------------------
+
+    if (!mcVersion.isEmpty() &&
+        mcVersion != "Любая версия") {
+        q.addQueryItem(
+            "gameVersion",
+            mcVersion);
     }
 
-    QNetworkReply* reply = apiGet(QString("/mods/%1/files").arg(projectId), q);
-    connect(reply, &QNetworkReply::finished, this, [this, reply, projectId]() {
-        reply->deleteLater();
-        if (reply->error() != QNetworkReply::NoError) {
-            emit errorOccurred("CurseForge: " + reply->errorString());
-            return;
-        }
-        QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
-        QJsonArray data = doc.object()["data"].toArray();
-        QVector<CFFileInfo> files;
-        for (const auto& item : data)
-            files.push_back(parseFile(item.toObject()));
-        emit filesReceived(projectId, files);
-    });
-}
+    //-----------------------------------
+    // Loader
+    //-----------------------------------
 
-// ── URL скачивания ────────────────────────────────────────────────────────────
-void CurseForgeClient::getDownloadUrl(int projectId, int fileId)
-{
-    QNetworkReply* reply = apiGet(
-        QString("/mods/%1/files/%2/download-url").arg(projectId).arg(fileId));
+    if (!loader.isEmpty() &&
+        loader != "Любой загрузчик") {
+        const QString l  = loader.toLower();
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply, fileId]() {
-        reply->deleteLater();
-        if (reply->error() != QNetworkReply::NoError) {
-            emit errorOccurred("CurseForge download: " + reply->errorString());
-            return;
-        }
-        QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
-        QString url = doc.object()["data"].toString();
-        if (url.isEmpty()) {
-            int part1 = fileId / 1000;
-            int part2 = fileId % 1000;
-            url = QString("https://edge.forgecdn.net/files/%1/%2/")
-                      .arg(part1).arg(QString::number(part2).rightJustified(3,'0'));
-        }
-        // Имя файла нужно передать снаружи — сигнал без fileName
-        emit downloadUrlReady(QUrl(url), QString());
-    });
+        if (l == "forge")
+            q.addQueryItem(
+                "modLoaderType",
+                "1");
+
+        else if (l == "fabric")
+            q.addQueryItem(
+                "modLoaderType",
+                "4");
+
+        else if (l == "neoforge")
+            q.addQueryItem(
+                "modLoaderType",
+                "6");
+
+        else if (l == "quilt")
+            q.addQueryItem(
+                "modLoaderType",
+                "5");
+    }
+
+    //-----------------------------------
+    // Request
+    //-----------------------------------
+
+    auto *reply  = apiGet(
+                QString(
+                    "/mods/%1/files")
+                .arg(projectId),
+                q);
+
+    connect(
+        reply,
+        &QNetworkReply::finished,
+        this,
+        [this, reply, projectId] {
+            reply->deleteLater();
+
+            if (reply->error() != QNetworkReply::NoError) {
+                emit errorOccurred("CurseForge: " + reply->errorString());
+
+                return;
+            }
+
+            const auto document  = QJsonDocument::fromJson(reply->readAll());
+
+            const auto data  = document.object()["data"].toArray();
+
+            QVector<FileInfo> files;
+
+            for (const auto &item: data) {
+                FileInfo file  = parseFile(item.toObject());
+
+                // fallback url
+                if (file.downloadUrl.isEmpty()) {
+                    const int part1  = file.id / 1000;
+
+                    const int part2  = file.id % 1000;
+
+                    file.downloadUrl = QString("https://edge.forgecdn.net/files/%1/%2/%3").arg(part1).arg(
+                        QString::number(part2).rightJustified(3, '0')).arg(file.fileName);
+                }
+
+                files.push_back(file);
+            }
+
+            emit filesReceived(projectId, files);
+        });
 }

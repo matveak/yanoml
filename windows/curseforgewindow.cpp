@@ -56,14 +56,14 @@ static QStringList defaultMCVersions() {
 static QString formatDownloadCount(quint64 count) {
     if (count >= 1'000'000ULL) {
         return QString::number(count / 1'000'000.0, 'f', 1) + "M";
-    }
-    if (count >= 1'000ULL) {
+    } else if (count >= 1'000ULL) {
         return QString::number(count / 1'000.0, 'f', 1) + "K";
+    } else {
+        return QString::number(count);
     }
-    return QString::number(count);
 }
 
-static QString buildFallbackDownloadUrl(const CFFileInfo& file) {
+static QString buildFallbackDownloadUrl(const FileInfo& file) {
     int part1 = file.id / 1000;
     int part2 = file.id % 1000;
     return FALLBACK_URL_TEMPLATE
@@ -74,7 +74,7 @@ static QString buildFallbackDownloadUrl(const CFFileInfo& file) {
 
 // ==================== Constructor ====================
 
-CurseForgeWindow::CurseForgeWindow(QWidget* parent)
+ModsBrowserWindow::ModsBrowserWindow(QWidget* parent)
     : QDialog(parent)
 {
     setWindowFlags(Qt::FramelessWindowHint | Qt::Dialog);
@@ -85,8 +85,8 @@ CurseForgeWindow::CurseForgeWindow(QWidget* parent)
     m_frame = new WindowFrame(this);
     m_frame->setTitle("CurseForge — Моды и Модпаки");
 
-    // ── Переключатель источника модов — прямо в шапке окна ───────────
-    // (слева от кнопок свернуть/закрыть, без выпадающего меню)
+    buildAPITabs();
+
     {
         auto* switcherLayout = m_frame->titleBar()->rightLayout();
 
@@ -116,7 +116,6 @@ CurseForgeWindow::CurseForgeWindow(QWidget* parent)
 
         connect(modrinthBtn, &QPushButton::clicked, this, [this] {
             auto* window = new ModWindow(parentWidget());
-            window->setSettingsWindow(m_settings);
             window->setAttribute(Qt::WA_DeleteOnClose);
             window->exec();
             close();
@@ -141,8 +140,6 @@ CurseForgeWindow::CurseForgeWindow(QWidget* parent)
     contentLayout->setContentsMargins(16, 16, 16, 16);
     contentLayout->setSpacing(12);
 
-    // Network clients
-    m_cf = new CurseForgeClient(this);
     m_nam = new QNetworkAccessManager(this);
 
     // Connections
@@ -154,24 +151,24 @@ CurseForgeWindow::CurseForgeWindow(QWidget* parent)
     buildTabs(contentLayout);
 
     // Initial load
-    m_cf->searchMods("", "", "", CFProjectType::Mod, 20);
+    currentAPI()->searchMods("", "", "");
     m_progress->show();
     m_status->setText("Загрузка модов...");
 }
 
 // ==================== Setup Methods ====================
 
-void CurseForgeWindow::setupConnections()
+void ModsBrowserWindow::setupConnections()
 {
-    connect(m_cf, &CurseForgeClient::modsReceived,
-            this, &CurseForgeWindow::onModsReceived);
-    connect(m_cf, &CurseForgeClient::modpacksReceived,
-            this, &CurseForgeWindow::onModpacksReceived);
-    connect(m_cf, &CurseForgeClient::errorOccurred,
-            this, &CurseForgeWindow::onError);
+    connect(currentAPI(), &ModsAPI::modsReceived,
+            this, &ModsBrowserWindow::onModsReceived);
+    connect(currentAPI(), &ModsAPI::modpacksReceived,
+            this, &ModsBrowserWindow::onModpacksReceived);
+    connect(currentAPI(), &ModsAPI::errorOccurred,
+            this, &ModsBrowserWindow::onError);
 }
 
-void CurseForgeWindow::buildHeader(QVBoxLayout* layout)  // Изменили QLayout* на QVBoxLayout*
+void ModsBrowserWindow::buildHeader(QVBoxLayout* layout)  // Изменили QLayout* на QVBoxLayout*
 {
     auto* header = new QHBoxLayout();
 
@@ -189,7 +186,7 @@ void CurseForgeWindow::buildHeader(QVBoxLayout* layout)  // Изменили QLa
     layout->addLayout(header);  // Теперь работает
 }
 
-void CurseForgeWindow::buildProgressSection(QVBoxLayout* layout)
+void ModsBrowserWindow::buildProgressSection(QVBoxLayout* layout)
 {
     m_progress = new QProgressBar(this);
     m_progress->setRange(0, 0);
@@ -206,7 +203,7 @@ void CurseForgeWindow::buildProgressSection(QVBoxLayout* layout)
     layout->addWidget(m_status);
 }
 
-void CurseForgeWindow::buildTabs(QVBoxLayout* layout)  // Изменили QLayout* на QVBoxLayout*
+void ModsBrowserWindow::buildTabs(QVBoxLayout* layout)  // Изменили QLayout* на QVBoxLayout*
 {
     m_tabs = new QTabWidget(this);
     buildModsTab();
@@ -214,12 +211,12 @@ void CurseForgeWindow::buildTabs(QVBoxLayout* layout)  // Изменили QLayo
     layout->addWidget(m_tabs, 1);  // Теперь работает
 
     connect(m_tabs, &QTabWidget::currentChanged,
-            this, &CurseForgeWindow::onTabChanged);
+            this, &ModsBrowserWindow::onTabChanged);
 }
 
 // ==================== Tab Builders ====================
 
-void CurseForgeWindow::buildModsTab()
+void ModsBrowserWindow::buildModsTab()
 {
     auto* widget = new QWidget();
     auto* layout = new QVBoxLayout(widget);
@@ -247,8 +244,8 @@ void CurseForgeWindow::buildModsTab()
     auto* searchButton = new QPushButton("Найти");
     searchButton->setFixedHeight(SEARCH_FIELD_HEIGHT);
     searchButton->setStyleSheet(Theme::curseForgeButtonStyle());
-    connect(searchButton, &QPushButton::clicked, this, &CurseForgeWindow::onSearch);
-    connect(m_modSearch, &QLineEdit::returnPressed, this, &CurseForgeWindow::onSearch);
+    connect(searchButton, &QPushButton::clicked, this, &ModsBrowserWindow::onSearch);
+    connect(m_modSearch, &QLineEdit::returnPressed, this, &ModsBrowserWindow::onSearch);
     searchRow->addWidget(searchButton);
 
     layout->addLayout(searchRow);
@@ -263,7 +260,7 @@ void CurseForgeWindow::buildModsTab()
     m_tabs->addTab(widget, "⚙ Моды");
 }
 
-void CurseForgeWindow::buildModpacksTab()
+void ModsBrowserWindow::buildModpacksTab()
 {
     auto* widget = new QWidget();
     auto* layout = new QVBoxLayout(widget);
@@ -286,8 +283,8 @@ void CurseForgeWindow::buildModpacksTab()
     auto* searchButton = new QPushButton("Найти");
     searchButton->setFixedHeight(SEARCH_FIELD_HEIGHT);
     searchButton->setStyleSheet(Theme::curseForgeButtonStyle());
-    connect(searchButton, &QPushButton::clicked, this, &CurseForgeWindow::onSearch);
-    connect(m_packSearch, &QLineEdit::returnPressed, this, &CurseForgeWindow::onSearch);
+    connect(searchButton, &QPushButton::clicked, this, &ModsBrowserWindow::onSearch);
+    connect(m_packSearch, &QLineEdit::returnPressed, this, &ModsBrowserWindow::onSearch);
     searchRow->addWidget(searchButton);
 
     layout->addLayout(searchRow);
@@ -302,7 +299,7 @@ void CurseForgeWindow::buildModpacksTab()
     m_tabs->addTab(widget, "📦 Модпаки");
 }
 
-QScrollArea* CurseForgeWindow::createScrollArea()
+QScrollArea* ModsBrowserWindow::createScrollArea()
 {
     auto* scrollArea = new QScrollArea();
     scrollArea->setWidgetResizable(true);
@@ -316,34 +313,34 @@ QScrollArea* CurseForgeWindow::createScrollArea()
 
 // ==================== Event Handlers ====================
 
-void CurseForgeWindow::onSearch()
+void ModsBrowserWindow::onSearch()
 {
     m_progress->show();
 
     if (m_tabs->currentIndex() == 0) {
         m_status->setText("Поиск модов...");
         clearLayout(m_modCards);
-        m_cf->searchMods(m_modSearch->text(),
+        currentAPI()->searchMods(m_modSearch->text(),
                          m_modVersion->currentText(),
                          m_modLoader->currentText());
     } else {
         m_status->setText("Поиск модпаков...");
         clearLayout(m_packCards);
-        m_cf->searchModpacks(m_packSearch->text(),
+        currentAPI()->searchModpacks(m_packSearch->text(),
                              m_packVersion->currentText());
     }
 }
 
-void CurseForgeWindow::onTabChanged(int index)
+void ModsBrowserWindow::onTabChanged(int index)
 {
     if (index == 1 && m_packCards->count() == 0) {
         m_progress->show();
         m_status->setText("Загрузка модпаков...");
-        m_cf->searchModpacks("", "");
+        currentAPI()->searchModpacks("", "");
     }
 }
 
-void CurseForgeWindow::onModsReceived(const QVector<CFMod>& mods)
+void ModsBrowserWindow::onModsReceived(const QVector<ModInfo>& mods)
 {
     m_progress->hide();
     m_status->setText(QString("Найдено: %1 модов").arg(mods.size()));
@@ -351,7 +348,7 @@ void CurseForgeWindow::onModsReceived(const QVector<CFMod>& mods)
     displayMods(mods, m_modCards, m_modStore, false);
 }
 
-void CurseForgeWindow::onModpacksReceived(const QVector<CFMod>& packs)
+void ModsBrowserWindow::onModpacksReceived(const QVector<ModInfo>& packs)
 {
     m_progress->hide();
     m_status->setText(QString("Найдено: %1 модпаков").arg(packs.size()));
@@ -359,7 +356,7 @@ void CurseForgeWindow::onModpacksReceived(const QVector<CFMod>& packs)
     displayMods(packs, m_packCards, m_packStore, true);
 }
 
-void CurseForgeWindow::onError(const QString& error)
+void ModsBrowserWindow::onError(const QString& error)
 {
     m_status->setText("⚠ " + error);
     m_progress->hide();
@@ -367,9 +364,9 @@ void CurseForgeWindow::onError(const QString& error)
 
 // ==================== Display Methods ====================
 
-void CurseForgeWindow::displayMods(const QVector<CFMod>& mods,
+void ModsBrowserWindow::displayMods(const QVector<ModInfo>& mods,
                                    QVBoxLayout* layout,
-                                   QHash<int, CFMod>& store,
+                                   QHash<int, ModInfo>& store,
                                    bool isModpack)
 {
     store.clear();
@@ -381,7 +378,7 @@ void CurseForgeWindow::displayMods(const QVector<CFMod>& mods,
     }
 }
 
-QFrame* CurseForgeWindow::createModCard(const CFMod& mod, bool isModpack)
+QFrame* ModsBrowserWindow::createModCard(const ModInfo& mod, bool isModpack)
 {
     auto* card = new QFrame();
     card->setStyleSheet(QString(
@@ -411,7 +408,7 @@ QFrame* CurseForgeWindow::createModCard(const CFMod& mod, bool isModpack)
     return card;
 }
 
-QLabel* CurseForgeWindow::createIconLabel(const QString& iconUrl)
+QLabel* ModsBrowserWindow::createIconLabel(const QString& iconUrl)
 {
     auto* iconLabel = new QLabel();
     iconLabel->setFixedSize(ICON_SIZE, ICON_SIZE);
@@ -426,7 +423,7 @@ QLabel* CurseForgeWindow::createIconLabel(const QString& iconUrl)
     return iconLabel;
 }
 
-void CurseForgeWindow::downloadIconAsync(const QString& url, QLabel* target)
+void ModsBrowserWindow::downloadIconAsync(const QString& url, QLabel* target)
 {
     auto* reply = m_nam->get(QNetworkRequest(QUrl(url)));
     connect(reply, &QNetworkReply::finished, this, [reply, target] {
@@ -441,7 +438,7 @@ void CurseForgeWindow::downloadIconAsync(const QString& url, QLabel* target)
     });
 }
 
-QVBoxLayout* CurseForgeWindow::createInfoLayout(const CFMod& mod)
+QVBoxLayout* ModsBrowserWindow::createInfoLayout(const ModInfo& mod)
 {
     auto* layout = new QVBoxLayout();
     layout->setSpacing(4);
@@ -476,10 +473,10 @@ QVBoxLayout* CurseForgeWindow::createInfoLayout(const CFMod& mod)
     return layout;
 }
 
-QLabel* CurseForgeWindow::createVersionsLabel(const QStringList& versions)
+QLabel* ModsBrowserWindow::createVersionsLabel(const QStringList& versions)
 {
     QStringList sorted = versions;
-    std::ranges::sort(sorted, std::greater<QString>());
+    std::ranges::sort(sorted, std::greater());
 
     QString versionText = sorted.mid(0, MAX_VERSIONS_DISPLAY).join(", ");
     if (sorted.size() > MAX_VERSIONS_DISPLAY) {
@@ -492,7 +489,7 @@ QLabel* CurseForgeWindow::createVersionsLabel(const QStringList& versions)
     return label;
 }
 
-QVBoxLayout* CurseForgeWindow::createActionsLayout(const CFMod& mod, bool isModpack)
+QVBoxLayout* ModsBrowserWindow::createActionsLayout(const ModInfo& mod, bool isModpack)
 {
     auto* layout = new QVBoxLayout();
     layout->setSpacing(8);
@@ -519,7 +516,7 @@ QVBoxLayout* CurseForgeWindow::createActionsLayout(const CFMod& mod, bool isModp
     return layout;
 }
 
-QPushButton* CurseForgeWindow::createInstallButton(const CFMod& mod, bool isModpack)
+QPushButton* ModsBrowserWindow::createInstallButton(const ModInfo& mod, bool isModpack)
 {
     auto* button = new QPushButton(isModpack ? "⬇ Скачать" : "+ Установить");
     button->setFixedSize(INSTALL_BUTTON_WIDTH, BUTTON_HEIGHT);
@@ -542,7 +539,7 @@ QPushButton* CurseForgeWindow::createInstallButton(const CFMod& mod, bool isModp
     return button;
 }
 
-QPushButton* CurseForgeWindow::createWebsiteButton(const QString& url)
+QPushButton* ModsBrowserWindow::createWebsiteButton(const QString& url)
 {
     auto* button = new QPushButton("🌐 CF");
     button->setFixedSize(WEB_BUTTON_WIDTH, WEB_BUTTON_HEIGHT);
@@ -561,7 +558,7 @@ QPushButton* CurseForgeWindow::createWebsiteButton(const QString& url)
 
 // ==================== Installation ====================
 
-void CurseForgeWindow::installItem(const CFMod& mod, bool isModpack)
+void ModsBrowserWindow::installItem(const ModInfo& mod, bool isModpack)
 {
     m_progress->show();
     m_status->setText(QString("Получение файлов для «%1»...").arg(mod.name));
@@ -572,12 +569,12 @@ void CurseForgeWindow::installItem(const CFMod& mod, bool isModpack)
     if (mcVersion == "Любая версия") mcVersion = "";
     if (loader == "Любой загрузчик") loader = "";
 
-    m_cf->getProjectFiles(mod.id, mcVersion, loader);
+    currentAPI()->getProjectFiles(mod.id, mcVersion, loader);
 
     // One-time connection for files
     auto connection = std::make_shared<QMetaObject::Connection>();
-    *connection = connect(m_cf, &CurseForgeClient::filesReceived,
-        this, [this, connection, mod, isModpack](int projectId, const QVector<CFFileInfo>& files) {
+    *connection = connect(currentAPI(), &ModsAPI::filesReceived,
+        this, [this, connection, mod, isModpack](int projectId, const QVector<FileInfo>& files) {
             if (projectId != mod.id) return;
 
             disconnect(*connection);
@@ -585,8 +582,8 @@ void CurseForgeWindow::installItem(const CFMod& mod, bool isModpack)
         });
 }
 
-void CurseForgeWindow::handleFilesReceived(const CFMod& mod,
-                                           const QVector<CFFileInfo>& files,
+void ModsBrowserWindow::handleFilesReceived(const ModInfo& mod,
+                                           const QVector<FileInfo>& files,
                                            bool isModpack)
 {
     if (files.isEmpty()) {
@@ -606,7 +603,7 @@ void CurseForgeWindow::handleFilesReceived(const CFMod& mod,
     downloadFile(QUrl(downloadUrl), file.fileName, isModpack);
 }
 
-void CurseForgeWindow::downloadFile(const QUrl& url,
+void ModsBrowserWindow::downloadFile(const QUrl& url,
                                     const QString& fileName,
                                     bool isModpack)
 {
@@ -658,7 +655,7 @@ void CurseForgeWindow::downloadFile(const QUrl& url,
         });
 }
 
-void CurseForgeWindow::handleDownloadFinished(QNetworkReply* reply,
+void ModsBrowserWindow::handleDownloadFinished(QNetworkReply* reply,
                                               QSaveFile* saveFile,
                                               const QString& fileName,
                                               const QString& savePath)
@@ -691,7 +688,7 @@ void CurseForgeWindow::handleDownloadFinished(QNetworkReply* reply,
 
 // ==================== Utility Methods ====================
 
-void CurseForgeWindow::clearLayout(QVBoxLayout* layout)
+void ModsBrowserWindow::clearLayout(QVBoxLayout* layout)
 {
     QLayoutItem* item;
     while ((item = layout->takeAt(0)) != nullptr) {
@@ -705,7 +702,7 @@ void CurseForgeWindow::clearLayout(QVBoxLayout* layout)
     }
 }
 
-void CurseForgeWindow::clearNestedLayout(QLayout* layout)
+void ModsBrowserWindow::clearNestedLayout(QLayout* layout)
 {
     QLayoutItem* item;
     while ((item = layout->takeAt(0)) != nullptr) {
@@ -717,4 +714,25 @@ void CurseForgeWindow::clearNestedLayout(QLayout* layout)
         }
         delete item;
     }
+}
+
+void ModsBrowserWindow::buildAPITabs()
+{
+    m_apiTabs = new QTabWidget(this);
+
+    for(auto api : m_apis)
+    {
+        auto *widget = createAPIWidget(api);
+
+        m_apiTabs->addTab(
+            widget,
+            Theme::platformIcon(api->accentColor(),
+                                api->name().front()),
+            api->name());
+    }
+}
+
+ModsAPI* ModsBrowserWindow::currentAPI() const
+{
+    return m_apis[m_apiTabs->currentIndex()];
 }
