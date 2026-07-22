@@ -11,7 +11,7 @@
 
 
 
-ManifestDownloader::ManifestDownloader(QNetworkAccessManager *manager, QObject* parent) : Downloader(manager, parent) {
+ManifestDownloader::ManifestDownloader(QNetworkAccessManager *manager) : Downloader(manager) {
 
 }
 

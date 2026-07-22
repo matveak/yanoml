@@ -4,10 +4,16 @@
 
 #include "loaderinstaller.h"
 
+#include <QNetworkAccessManager>
 #include <QDir>
 #include <QJsonObject>
 #include <QNetworkReply>
 #include <QProcess>
+#include <QSaveFile>
+
+class QNetworkReply;
+class QUrl;
+class QString;
 
 static QString pickNeoForgeMavenForMc(const QString& xml, const QString& mcVersion, bool allowPrerelease)
 {
@@ -269,14 +275,10 @@ void LoaderInstaller::installFabric(const QString& mcVersion, const QString& gam
             */
 }
 
-void LoaderInstaller::installForgeLike(const QString& mcVersion,
-                                           const QString& loader,
-                                           const QString& javaExe,
-                                           const QString& gameDir)
-{
+void LoaderInstaller::installForgeLike(const QString& mcVersion, const QString& loader, const QString& javaExe, const QString& gameDir) {
     if (loader == "forge")
     {
-        QNetworkReply* promoReply = d.m_manager->get(QNetworkRequest(QUrl(
+        QNetworkReply* promoReply = m_manager->get(QNetworkRequest(QUrl(
             "https://files.minecraftforge.net/net/minecraftforge/forge/"
             "promotions_slim.json")));
 
@@ -315,7 +317,7 @@ void LoaderInstaller::installForgeLike(const QString& mcVersion,
     }
     else // neoforge
     {
-        QNetworkReply* metaReply = d.m_manager->get(QNetworkRequest(QUrl(
+        QNetworkReply* metaReply = m_manager->get(QNetworkRequest(QUrl(
             "https://maven.neoforged.net/releases/net/neoforged/neoforge/"
             "maven-metadata.xml")));
 
@@ -351,12 +353,7 @@ void LoaderInstaller::installForgeLike(const QString& mcVersion,
     }
 }
 
-void LoaderInstaller::runLoaderInstaller(const QUrl& installerUrl,
-                                             const QString& mcVersion,
-                                             const QString& loader,
-                                             const QString& javaExe,
-                                             const QString& gameDir)
-{
+void LoaderInstaller::runLoaderInstaller(const QUrl& installerUrl, const QString& mcVersion, const QString& loader, const QString& javaExe, const QString& gameDir) {
     const QString installersDir = gameDir + "/.installers";
     QDir().mkpath(installersDir);
     const QString installerPath =
@@ -413,7 +410,7 @@ void LoaderInstaller::runLoaderInstaller(const QUrl& installerUrl,
 
                     const QString versionJson = gameDir + "/versions/" + id + "/" + id + ".json";
                     qDebug() << "downloading libraries";
-                    d.downloadLibrariesFromVersionJson(versionJson, gameDir, [=]
+                    downloadLibrariesFromVersionJson(versionJson, gameDir, [=]
                     {
                         emit loaderInstalled(id);
                     });
@@ -436,7 +433,7 @@ void LoaderInstaller::runLoaderInstaller(const QUrl& installerUrl,
         return;
     }
 
-    QNetworkReply* r = d.m_manager->get(QNetworkRequest(installerUrl));
+    QNetworkReply* r = m_manager->get(QNetworkRequest(installerUrl));
     auto* f = new QSaveFile(installerPath);
 
     if (!f->open(QIODevice::WriteOnly))
@@ -448,7 +445,7 @@ void LoaderInstaller::runLoaderInstaller(const QUrl& installerUrl,
     }
 
     connect(r, &QNetworkReply::downloadProgress,
-            this, &MinecraftInstaller::downloadProgress);
+            this, &LoaderInstaller::downloadProgress);
     connect(r, &QNetworkReply::readyRead, this,
             [r, f] { f->write(r->readAll()); });
 
@@ -475,4 +472,7 @@ void LoaderInstaller::runLoaderInstaller(const QUrl& installerUrl,
 
                 runProc();
             });
+}
+
+LoaderInstaller::LoaderInstaller(QNetworkAccessManager *manager) : Downloader(manager) {
 }

@@ -10,6 +10,8 @@
 #include <QProcess>
 #include <QSaveFile>
 
-MinecraftInstaller::MinecraftInstaller(QObject* parent) : m_manager(new QNetworkAccessManager(parent)), m_manifestDownloader(m_manager), m_minecraftDownloader(m_manager),
-                                                          m_javaDownloader(m_manager) {
-}
+MinecraftInstaller::MinecraftInstaller(QObject *parent) : m_manager(new QNetworkAccessManager(parent)),
+                                                          m_manifestDownloader(m_manager),
+                                                          m_minecraftDownloader(m_manager),
+                                                          m_javaDownloader(m_manager),
+                                                          m_loaderInstaller(m_manager){}

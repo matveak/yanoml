@@ -172,7 +172,7 @@ void MinecraftLauncher::ensureJava(const QString& mcVersion,
                         cb(javaExe);
                     });
 
-    m_downloader->jd.downloadJavaRuntime(javaComponent, runtimeDir);
+    m_javaDownloader->downloadJavaRuntime(javaComponent, runtimeDir);
 }
 
 void MinecraftLauncher::launchGame(const QJsonObject& root,

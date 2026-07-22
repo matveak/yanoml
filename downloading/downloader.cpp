@@ -50,7 +50,7 @@ static bool libraryAllowedOnCurrentOS(const QJsonObject& lib)
 }
 
 
-Downloader::Downloader(QNetworkAccessManager *manager, QObject *parent) {
+Downloader::Downloader(QNetworkAccessManager *manager) {
 	this->m_manager = manager;
 	manager->setTransferTimeout(3000);
 }

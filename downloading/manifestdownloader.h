@@ -23,9 +23,7 @@ class ManifestDownloader : public Downloader
 	Q_OBJECT
 
 public:
-	explicit ManifestDownloader(
-		QNetworkAccessManager* manager,
-		QObject* parent = nullptr);
+	explicit ManifestDownloader(QNetworkAccessManager* manager);
 
 	ManifestDownloader(Downloader &d);
 

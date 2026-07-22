@@ -29,7 +29,7 @@ public:
 	//TODO: protected
 	QNetworkAccessManager *m_manager;
 
-	explicit Downloader(QNetworkAccessManager *manager, QObject *parent = nullptr);
+	explicit Downloader(QNetworkAccessManager *manager);
 
 	Downloader(const Downloader &other);
 

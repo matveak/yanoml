@@ -33,6 +33,7 @@ signals:
 private:
 	QProcess            *m_minecraftProcess = nullptr;
 	MinecraftDownloader *m_downloader = nullptr;
+	JavaDownloader      *m_javaDownloader = nullptr;
 	QMap<int, QString>   m_installedJavas;
 };
 

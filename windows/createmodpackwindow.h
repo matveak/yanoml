@@ -41,12 +41,12 @@ private slots:
     void loadLoaderVersions();
 
 private:
-    WindowFrame         *m_frame           = nullptr;
-    MinecraftDownloader *m_downloader       = nullptr;
-    SettingsWindow      *m_settingsWindow   = nullptr;
-    QLineEdit           *m_nameEdit         = nullptr;
-    QComboBox           *m_versionBox       = nullptr;
-    QComboBox           *m_loaderBox        = nullptr;
-    QComboBox           *m_loaderVersionBox = nullptr;
-    QPushButton         *m_createButton     = nullptr;
+    WindowFrame         *m_frame             = nullptr;
+    MinecraftInstaller  *m_downloader        = nullptr;
+    SettingsWindow      *m_settingsWindow    = nullptr;
+    QLineEdit           *m_nameEdit          = nullptr;
+    QComboBox           *m_versionBox        = nullptr;
+    QComboBox           *m_loaderBox         = nullptr;
+    QComboBox           *m_loaderVersionBox  = nullptr;
+    QPushButton         *m_createButton      = nullptr;
 };

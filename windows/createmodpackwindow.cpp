@@ -103,65 +103,65 @@ void CreateModpackWindow::setSettingsWindow(
 {
     m_settingsWindow = settings;
 }
-
-void CreateModpackWindow::setDownloader(
-    MinecraftDownloader* d)
-{
-    if(!d)
-        return;
-
-    m_downloader = d;
-
-    connect(
-        m_downloader,
-        &MinecraftDownloader::vanillaVersionsReceived,
-        this,
-        &CreateModpackWindow::onVersionsLoaded);
-
-    connect(
-        m_downloader,
-        &MinecraftDownloader::fabricVersionsReceived,
-        this,
-        &CreateModpackWindow::onFabricVersions);
-
-    connect(
-        m_downloader,
-        &MinecraftDownloader::forgeVersionsReceived,
-        this,
-        &CreateModpackWindow::onForgeVersions);
-
-    connect(
-        m_downloader,
-        &MinecraftDownloader::neoforgeVersionReceived,
-        this,
-        &CreateModpackWindow::onNeoForgeVersions);
-
-    m_downloader->md.fetchVanillaVersions();
-}
-
-void CreateModpackWindow::loadLoaderVersions()
-{
-    if(!m_downloader)
-        return;
-
-    m_loaderVersionBox->clear();
-
-    QString loader =
-        m_loaderBox->currentText();
-
-    if(loader == "Fabric")
-    {
-        m_downloader->md.fetchFabricVersions();
-    }
-    else if(loader == "Forge")
-    {
-        m_downloader->md.fetchForgeVersions();
-    }
-    else if(loader == "NeoForge")
-    {
-        m_downloader->md.fetchNeoForgeVersions();
-    }
-}
+//
+// void CreateModpackWindow::setDownloader(
+//     MinecraftDownloader* d)
+// {
+//     if(!d)
+//         return;
+//
+//     m_downloader = d;
+//
+//     connect(
+//         m_downloader,
+//         &MinecraftDownloader::vanillaVersionsReceived,
+//         this,
+//         &CreateModpackWindow::onVersionsLoaded);
+//
+//     connect(
+//         m_downloader,
+//         &MinecraftDownloader::fabricVersionsReceived,
+//         this,
+//         &CreateModpackWindow::onFabricVersions);
+//
+//     connect(
+//         m_downloader,
+//         &MinecraftDownloader::forgeVersionsReceived,
+//         this,
+//         &CreateModpackWindow::onForgeVersions);
+//
+//     connect(
+//         m_downloader,
+//         &MinecraftDownloader::neoforgeVersionReceived,
+//         this,
+//         &CreateModpackWindow::onNeoForgeVersions);
+//
+//     m_mnifestDownloader->fetchVanillaVersions();
+// }
+//
+// void CreateModpackWindow::loadLoaderVersions()
+// {
+//     if(!m_downloader)
+//         return;
+//
+//     m_loaderVersionBox->clear();
+//
+//     QString loader =
+//         m_loaderBox->currentText();
+//
+//     if(loader == "Fabric")
+//     {
+//         m_downloader->md.fetchFabricVersions();
+//     }
+//     else if(loader == "Forge")
+//     {
+//         m_downloader->md.fetchForgeVersions();
+//     }
+//     else if(loader == "NeoForge")
+//     {
+//         m_downloader->md.fetchNeoForgeVersions();
+//     }
+// }
 
 void CreateModpackWindow::onVersionsLoaded(
     const QVector<MinecraftVersion>& versions)

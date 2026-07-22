@@ -65,7 +65,7 @@ private:
     QProgressBar        *m_progressBar      = nullptr;
     QSystemTrayIcon     *m_trayIcon         = nullptr;
     SettingsWindow      *m_settingsWindow   = nullptr;
-    MinecraftDownloader *m_downloader       = nullptr;
+    MinecraftInstaller *m_downloader = nullptr;
     MinecraftLauncher   *m_launcher         = nullptr;
     QComboBox           *m_LoaderBox        = nullptr;
     bool                 m_modLoaderPending = false;

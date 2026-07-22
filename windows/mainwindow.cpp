@@ -318,7 +318,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), m_rightPanelLayou
     m_progressBar->hide();
     m_rightPanelLayout->insertWidget(m_rightPanelLayout->count() - 1, m_progressBar);
 
-    m_downloader = new MinecraftDownloader(this);
+    m_downloader = new MinecraftInstaller(this);
     m_settingsWindow = new SettingsWindow(this);
 
     setupTrayIcon();
@@ -390,7 +390,7 @@ void MainWindow::on_InstallerButton_clicked()
     m_modLoaderPending = true;
 
     auto conn = std::make_shared<QMetaObject::Connection>();
-    *conn = connect(m_downloader, &MinecraftDownloader::instanceCreated, this,
+    *conn = connect(m_downloader, &MinecraftInstaller::instanceCreated, this,
                     [this, conn, loader, cleanVersion, gameDir](const QString&)
                     {
                         disconnect(*conn);

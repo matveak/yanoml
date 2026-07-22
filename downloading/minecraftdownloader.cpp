@@ -4,11 +4,13 @@
 
 #include "minecraftdownloader.h"
 
+#include <QJsonObject>
 #include <QNetworkReply>
 #include <QSaveFile>
+#include <QTimer>
 
-void MinecraftDownloader::downloadAssetObject(const QUrl& url, const QString& outputPath, const QString& expectedHash, const int* downloaded, int total, const QString& instancePath, int attempt) {
-    QNetworkReply *reply = d.m_manager->get(QNetworkRequest(url));
+void MinecraftDownloader::downloadAssetObject(const QUrl &url, const QString &outputPath, const QString &expectedHash, int *downloaded, int total, const QString &instancePath, int attempt) {
+    QNetworkReply *reply = m_manager->get(QNetworkRequest(url));
     auto file = new QSaveFile(outputPath);
     auto sha1 = new QCryptographicHash(QCryptographicHash::Sha1);
 
@@ -78,44 +80,35 @@ void MinecraftDownloader::downloadAssetObject(const QUrl& url, const QString& ou
             });
 }
 
-void MinecraftDownloader::markAssetDone(int* downloaded, int total,
-                                        const QString& instancePath)
-{
+void MinecraftDownloader::markAssetDone(int *downloaded, int total, const QString &instancePath) {
     ++(*downloaded);
     emit totalProgress(*downloaded * 100 / total);
 
-    if (*downloaded >= total)
-    {
+    if (*downloaded >= total) {
         emit instanceCreated(instancePath);
         delete downloaded;
     }
 }
 
 void MinecraftDownloader::downloadVanillaVersion(
-    const QString& versionJsonUrl,
-    const QString& outputJar)
-{
-    QNetworkReply* reply = d.m_manager->get(QNetworkRequest(QUrl(versionJsonUrl)));
+    const QString &versionJsonUrl,
+    const QString &outputJar) {
+    QNetworkReply *reply = m_manager->get(QNetworkRequest(QUrl(versionJsonUrl)));
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply, outputJar]
-            {
-                reply->deleteLater();
+    connect(reply, &QNetworkReply::finished, this, [this, reply, outputJar] {
+        reply->deleteLater();
 
-                if (reply->error() != QNetworkReply::NoError)
-                {
-                    qDebug() << reply->errorString();
-                    return;
-                }
+        if (reply->error() != QNetworkReply::NoError) {
+            qDebug() << reply->errorString();
+            return;
+        }
 
-                QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
-                QString clientUrl = doc.object()["downloads"]
-                                        .toObject()["client"]
-                                        .toObject()["url"]
-                                        .toString();
+        QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+        QString clientUrl = doc.object()["downloads"].toObject()["client"].toObject()["url"].toString();
 
-                if (!clientUrl.isEmpty())
-                    d.downloadFile(QUrl(clientUrl), outputJar);
-                else
-                    emit errorOccurred("Не удалось найти ссылку на клиент");
-            });
+        if (!clientUrl.isEmpty())
+            downloadFile(QUrl(clientUrl), outputJar);
+        else
+            emit errorOccurred("Не удалось найти ссылку на клиент");
+    });
 }
